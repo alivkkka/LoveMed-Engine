@@ -308,6 +308,9 @@ function openEditor(id){
 }
 function closeEditor(){editorId=null;document.querySelector('#lmEditor')?.classList.add('hidden');}
 function bindEditor(){
+ const editor=document.querySelector('#lmEditor');
+ if(!editor||editor.dataset.bound==='1')return;
+ editor.dataset.bound='1';
  document.querySelector('#lmEditorSave').onclick=()=>{
   if(!editorId)return;
   const name=document.querySelector('#lmEditName').value.trim(),cat=document.querySelector('#lmEditCat').value,description=document.querySelector('#lmEditDesc').value.trim();
@@ -333,31 +336,54 @@ function bindEditor(){
 function render(){const b=document.querySelector('#lmBody');if(!b)return;const s=getState(),u=ui();b.innerHTML=page(u.tab,s);bind();}
 
 function bind(){
- bindEditor();
- document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{const u=ui();u.tab=b.dataset.tab;saveUI(u);render();});
- document.querySelectorAll('[data-rel]').forEach(x=>x.oninput=async e=>{const s=getState();s.relation[e.target.dataset.rel]=Number(e.target.value);await saveState(s);render();});
- document.querySelector('#lmAnamnesis')?.addEventListener('click',anamnesis);
- document.querySelector('#lmAnamnesis2')?.addEventListener('click',anamnesis);
- [['#lmIntensity','reactionIntensity'],['#lmChance','reactionChance'],['#lmCooldown','reactionCooldown']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('input',async e=>{const s=getState();s[k]=Number(e.target.value);await saveState(s);}));
- document.querySelector('#lmAddKink')?.addEventListener('click',()=>{
-  const n=document.querySelector('#lmKinkName').value.trim(),d=document.querySelector('#lmKinkDesc').value.trim(),cat=document.querySelector('#lmKinkCat').value;
-  const words=document.querySelector('#lmKinkWords').value.split(/[,;\n]/).map(x=>x.trim()).filter(Boolean);
-  if(!n){toast('Введите название');return;} addCustom(n,cat,d,words.length?words:[n.toLowerCase()]);render();toast('Запись добавлена');
+ // Events are delegated from the stable overlay, so rerendering #lmBody never kills buttons.
+ if(window.__loveMedPanelEventsBound)return;
+ const overlay=document.querySelector('#lmOverlay');
+ if(!overlay)return;
+ window.__loveMedPanelEventsBound=true;
+ overlay.addEventListener('click',async e=>{
+  const tab=e.target.closest('[data-tab]');
+  if(tab){const u=ui();u.tab=tab.dataset.tab;saveUI(u);render();return;}
+  const edit=e.target.closest('[data-edit-kink]');
+  if(edit){openEditor(edit.dataset.editKink);return;}
+  const remDiag=e.target.closest('[data-remove-diagnosis]');
+  if(remDiag){removeDiagnosisOnly(remDiag.dataset.removeDiagnosis);return;}
+  const del=e.target.closest('[data-del-kink]');
+  if(del){deleteLibraryRecord(del.dataset.delKink);render();toast('Запись удалена');return;}
+  const restore=e.target.closest('[data-restore-kink]');
+  if(restore){restoreBuiltin(restore.dataset.restoreKink);render();toast('Исходная запись восстановлена');return;}
+  const anam=e.target.closest('#lmAnamnesis,#lmAnamnesis2');
+  if(anam){anamnesis();return;}
+  const add=e.target.closest('#lmAddKink');
+  if(add){
+   const n=document.querySelector('#lmKinkName')?.value.trim()||'',d=document.querySelector('#lmKinkDesc')?.value.trim()||'',cat=document.querySelector('#lmKinkCat')?.value||'psych';
+   const words=(document.querySelector('#lmKinkWords')?.value||'').split(/[,;\n]/).map(x=>x.trim()).filter(Boolean);
+   if(!n){toast('Введите название');return;}
+   addCustom(n,cat,d,words.length?words:[n.toLowerCase()]);render();toast('Запись добавлена');return;
+  }
+  const contact=e.target.closest('[data-del-contact]');
+  if(contact){const st=getState();st.contacts=st.contacts.filter(x=>x.id!==contact.dataset.delContact);await saveState(st);render();return;}
+  if(e.target.closest('#lmParse')){toast(parseLatest()?'Пакет принят ✓':'Пакет не найден');return;}
  });
- document.querySelectorAll('[data-edit-kink]').forEach(b=>b.onclick=()=>openEditor(b.dataset.editKink));
- document.querySelectorAll('[data-remove-diagnosis]').forEach(b=>b.onclick=()=>removeDiagnosisOnly(b.dataset.removeDiagnosis));
- document.querySelectorAll('[data-del-kink]').forEach(b=>b.onclick=()=>{deleteLibraryRecord(b.dataset.delKink);render();toast('Запись удалена');});
- document.querySelectorAll('[data-restore-kink]').forEach(b=>b.onclick=()=>{restoreBuiltin(b.dataset.restoreKink);render();toast('Исходная запись восстановлена');});
- document.querySelectorAll('[data-del-contact]').forEach(b=>b.onclick=async()=>{const s=getState();s.contacts=s.contacts.filter(x=>x.id!==b.dataset.delContact);await saveState(s);render();});
- [['#lmEnabled','enabled'],['#lmAutoTrack','autoTrack'],['#lmAutoReaction','autoReaction']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('change',async e=>{const s=getState();s[k]=e.target.checked;await saveState(s);}));
- document.querySelector('#lmParse')?.addEventListener('click',()=>toast(parseLatest()?'Пакет принят ✓':'Пакет не найден'));
- document.querySelector('#lmFab')?.addEventListener('change',e=>{const u=ui();u.showFab=e.target.checked;saveUI(u);syncFab();});
+ overlay.addEventListener('input',async e=>{
+  if(e.target.matches('[data-rel]')){const st=getState();st.relation[e.target.dataset.rel]=Number(e.target.value);await saveState(st);render();return;}
+  const sliders={'#lmIntensity':'reactionIntensity','#lmChance':'reactionChance','#lmCooldown':'reactionCooldown'};
+  const key=Object.entries(sliders).find(([q])=>e.target.matches(q))?.[1];
+  if(key){const st=getState();st[key]=Number(e.target.value);await saveState(st);return;}
+ });
+ overlay.addEventListener('change',async e=>{
+  const toggles={'#lmEnabled':'enabled','#lmAutoTrack':'autoTrack','#lmAutoReaction':'autoReaction'};
+  const key=Object.entries(toggles).find(([q])=>e.target.matches(q))?.[1];
+  if(key){const st=getState();st[key]=e.target.checked;await saveState(st);return;}
+  if(e.target.matches('#lmFab')){const u=ui();u.showFab=e.target.checked;saveUI(u);syncFab();return;}
+ });
 }
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
  document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.2.1</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['react','🧪 Реактивность'],['diag','🔬 Анамнез'],['contacts','👤 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
  document.querySelector('#lmClose').onclick=()=>document.querySelector('#lmOverlay').classList.add('hidden');
+ bind();
  ensureEditor();
 }
 function open(){ensurePanel();document.querySelector('#lmOverlay').classList.remove('hidden');render();}
