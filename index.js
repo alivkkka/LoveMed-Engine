@@ -378,8 +378,6 @@ function render(){
 function bind(){
  document.querySelectorAll('.lm-tabs [data-tab]').forEach(b=>b.onclick=()=>{const u=ui();u.tab=b.dataset.tab;saveUI(u);render();});
  document.querySelectorAll('[data-rel]').forEach(x=>x.oninput=async e=>{const st=getState();st.relation[e.target.dataset.rel]=Number(e.target.value);await saveState(st);render();});
- document.querySelector('#lmAnamnesis')?.addEventListener('click', e=>{e.preventDefault();anamnesis();});
- document.querySelector('#lmAnamnesis2')?.addEventListener('click', e=>{e.preventDefault();anamnesis();});
  [['#lmIntensity','reactionIntensity'],['#lmChance','reactionChance'],['#lmCooldown','reactionCooldown']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('input',async e=>{const st=getState();st[k]=Number(e.target.value);await saveState(st);}));
  document.querySelector('#lmAddKink')?.addEventListener('click',()=>{
   const n=document.querySelector('#lmKinkName')?.value.trim()||'',d=document.querySelector('#lmKinkDesc')?.value.trim()||'',cat=document.querySelector('#lmKinkCat')?.value||'psych';
@@ -399,8 +397,19 @@ function bind(){
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.2.3</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['react','🧪 Реактивность'],['diag','🔬 Анамнез'],['contacts','👤 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.2.4</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['react','🧪 Реактивность'],['diag','🔬 Анамнез'],['contacts','👤 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
  document.querySelector('#lmClose').onclick=()=>{editorId=null;document.querySelector('#lmOverlay').classList.add('hidden');};
+ const overlay=document.querySelector('#lmOverlay');
+ if(overlay&&!overlay.dataset.lovemedDelegated){
+  overlay.dataset.lovemedDelegated='1';
+  overlay.addEventListener('click',e=>{
+   const btn=e.target.closest?.('#lmAnamnesis, #lmAnamnesis2');
+   if(!btn)return;
+   e.preventDefault();
+   e.stopPropagation();
+   anamnesis();
+  });
+ }
 }
 function open(){ensurePanel();document.querySelector('#lmOverlay').classList.remove('hidden');render();}
 function placeFab(){const b=document.querySelector('#lmFabButton');if(!b)return;const u=ui(),p=8,w=b.offsetWidth||42,h=b.offsetHeight||42;b.style.left=Math.max(p,Math.min(innerWidth-w-p,u.x??innerWidth-w-p))+'px';b.style.top=Math.max(p,Math.min(innerHeight-h-p,u.y??120))+'px';b.style.right='auto';b.style.bottom='auto';}
