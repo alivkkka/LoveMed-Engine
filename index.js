@@ -226,7 +226,10 @@ function setDiagnosisManual(id,enabled){
  s.diagnosisManual=dm;syncDiagnosis(s);saveState(s);render();toast(enabled?'Добавлено в диагноз':'Убрано из диагноза');
 }
 function removeDiagnosisOnly(id){setDiagnosisManual(id,false);}
+let anamnesisRunning=false;
 function anamnesis(){
+ if(anamnesisRunning)return;
+ anamnesisRunning=true;
  try{
   const s=getState(),f=scan();
   s.anamnesis=f;
@@ -240,6 +243,8 @@ function anamnesis(){
  }catch(err){
   console.error('[LoveMed] Card scan failed:',err);
   toast('Не удалось просканировать карточку. Проверьте консоль SillyTavern.');
+ } finally {
+  anamnesisRunning=false;
  }
 }
 function visible(s){
@@ -373,8 +378,8 @@ function render(){
 function bind(){
  document.querySelectorAll('.lm-tabs [data-tab]').forEach(b=>b.onclick=()=>{const u=ui();u.tab=b.dataset.tab;saveUI(u);render();});
  document.querySelectorAll('[data-rel]').forEach(x=>x.oninput=async e=>{const st=getState();st.relation[e.target.dataset.rel]=Number(e.target.value);await saveState(st);render();});
- document.querySelector('#lmAnamnesis')?.addEventListener('click',anamnesis);
- document.querySelector('#lmAnamnesis2')?.addEventListener('click',anamnesis);
+ document.querySelector('#lmAnamnesis')?.addEventListener('click', e=>{e.preventDefault();anamnesis();});
+ document.querySelector('#lmAnamnesis2')?.addEventListener('click', e=>{e.preventDefault();anamnesis();});
  [['#lmIntensity','reactionIntensity'],['#lmChance','reactionChance'],['#lmCooldown','reactionCooldown']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('input',async e=>{const st=getState();st[k]=Number(e.target.value);await saveState(st);}));
  document.querySelector('#lmAddKink')?.addEventListener('click',()=>{
   const n=document.querySelector('#lmKinkName')?.value.trim()||'',d=document.querySelector('#lmKinkDesc')?.value.trim()||'',cat=document.querySelector('#lmKinkCat')?.value||'psych';
@@ -394,7 +399,7 @@ function bind(){
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.2.2</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['react','🧪 Реактивность'],['diag','🔬 Анамнез'],['contacts','👤 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.2.3</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['react','🧪 Реактивность'],['diag','🔬 Анамнез'],['contacts','👤 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
  document.querySelector('#lmClose').onclick=()=>{editorId=null;document.querySelector('#lmOverlay').classList.add('hidden');};
 }
 function open(){ensurePanel();document.querySelector('#lmOverlay').classList.remove('hidden');render();}
