@@ -85,4 +85,45 @@
  .lm-panel{width:min(560px,92vw);max-width:560px;}
  .lm-kinks{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
  .lm-kink-btn{width:100% !important;}
- }
+}
+
+
+/* v0.2.3 — restore the original preference-chip layout */
+.lm-kinks{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  align-items:flex-start !important;
+  gap:7px !important;
+  padding-top:10px !important;
+}
+.lm-kink-btn{
+  width:auto !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  min-height:34px !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:7px !important;
+  padding:7px 11px !important;
+  border-radius:999px !important;
+  white-space:normal !important;
+  text-align:left !important;
+  box-sizing:border-box !important;
+}
+.lm-kink-btn span{
+  padding:0 !important;
+  border:0 !important;
+  background:transparent !important;
+}
+.lm-overlay button,
+.lm-overlay input,
+.lm-overlay textarea,
+.lm-overlay select{
+  border-radius:12px !important;
+}
+.lm-kink-btn{border-radius:999px !important;}
+@media(max-width:600px){
+  .lm-kinks{display:flex !important;flex-wrap:wrap !important;}
+  .lm-kink-btn{width:auto !important;max-width:100% !important;}
+}
