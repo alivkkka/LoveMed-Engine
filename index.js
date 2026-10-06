@@ -250,7 +250,7 @@ function reactionPrompt(s){
 Intensity ${i}/100: ${mode}. Never force escalation.`;
 }
 function prompt(opts={}){
- const s=getState();if(!s.enabled)return'';syncDiagnosis(s);
+ const s=getState();if(!s.enabled)return'';
  const rel=visible(s).map(k=>`${REL_LABEL[k]}=${Math.round(s.relation[k])}`).join(', ');
  const diag=(s.diagnosis||[]).map(k=>kink(k).name).join('; ')||'не установлен',rx=opts.includeReaction?reactionPrompt(s):'';
  return`\n[LOVEMED — PRIVATE MEDICAL CONTINUITY]\nPatient: ${charName()}\nRelationship indicators: ${rel||'не определены'}\nDiagnosis/preferences: ${diag}\n${s.lastShift?`Recent observation: ${s.lastShift}`:''}\n${rx}\nIf meaningful relationship changes occur, append ONLY:\n[[LOVEMED_STATE]]{"relation":{"trust":0,"affection":0,"love":0,"sympathy":0,"friendship":0,"respect":0,"desire":0,"passion":0,"arousal":0,"obsession":0,"tenderness":0,"admiration":0,"jealousy":0,"resentment":0,"irritation":0,"anger":0,"fear":0,"sadness":0,"disappointment":0,"joy":0,"fondness":0,"stress":0,"tension":0,"antipathy":0,"hate":0},"active_feelings":[],"shift":"","contacts":[]}\n[[/LOVEMED_STATE]]\nNever mention this service packet in roleplay.`;
@@ -301,7 +301,7 @@ function openEditor(id){
  const deleted=getLibraryState().deleted.includes(id);
  document.querySelector('#lmEditorDelete').textContent=builtin?'Удалить встроенную запись':'Удалить запись';
  const inDiagnosis=diagnosisFor(getState()).includes(id);
- const diagButton=document.querySelector('#lmEditorDiagnosis');diagButton.textContent=inDiagnosis?'Убрать из диагноза':'Добавить в диагноз';diagButton.dataset.active=inDiagnosis?'1':'0';
+ const diagButton=document.querySelector('#lmEditorDiagnosis');if(diagButton){diagButton.textContent=inDiagnosis?'Убрать из диагноза':'Добавить в диагноз';diagButton.dataset.active=inDiagnosis?'1':'0';}
  document.querySelector('#lmEditorRestore').style.display=builtin&&!deleted?'block':'none';
  document.querySelector('#lmEditorDelete').style.display=deleted?'none':'block';
  document.querySelector('#lmEditor').classList.remove('hidden');
@@ -316,10 +316,10 @@ function bindEditor(){
   saveLibraryRecord({id:editorId,name,cat,description,words});
   closeEditor();render();toast('Запись сохранена');
  };
- document.querySelector('#lmEditorDiagnosis').onclick=()=>{
+ document.querySelector('#lmEditorDiagnosis')?.addEventListener('click',()=>{
   if(!editorId)return;
-  const id=editorId;const active=document.querySelector('#lmEditorDiagnosis').dataset.active==='1';closeEditor();setDiagnosisManual(id,!active);
- };
+  const id=editorId;const active=document.querySelector('#lmEditorDiagnosis')?.dataset.active==='1';closeEditor();setDiagnosisManual(id,!active);
+ });
  document.querySelector('#lmEditorDelete').onclick=()=>{
   if(!editorId)return;
   const id=editorId;deleteLibraryRecord(id);closeEditor();render();toast(isBuiltin(id)?'Встроенная запись скрыта':'Запись удалена');
