@@ -53,7 +53,7 @@ intensity:'Предпочтение более выраженной эмоцио
 
 const CAT_LABEL={psych:'Психологические',physical:'Физические / сенсорные',situational:'Ситуационные',romantic:'Романтические'};
 
-const defaults=()=>({enabled:true,autoTrack:true,autoReaction:true,relation:Object.fromEntries(REL_FIELDS.map(([k])=>[k,0])),activeFeelings:[],lastShift:'',diagnosis:[],anamnesis:[],anamnesisAt:0,reactionIntensity:55,reactionChance:35,reactionCooldown:4,reactionCooldownRemaining:0,lastReaction:'',contacts:[],history:[],charName:'',updatedAt:Date.now(),diagnostics:{lastParseAt:0,lastParseStatus:'Ожидает проверки',lastParseError:''}});
+const defaults=()=>({enabled:true,autoTrack:true,autoReaction:true,relation:Object.fromEntries(REL_FIELDS.map(([k])=>[k,0])),activeFeelings:[],lastShift:'',diagnosis:[],diagnosisManual:{added:[],removed:[]},anamnesis:[],anamnesisAt:0,reactionIntensity:55,reactionChance:35,reactionCooldown:4,reactionCooldownRemaining:0,lastReaction:'',contacts:[],history:[],charName:'',updatedAt:Date.now(),diagnostics:{lastParseAt:0,lastParseStatus:'Ожидает проверки',lastParseError:''}});
 const ctx=()=>{try{return getContext?.()||globalThis.SillyTavern?.getContext?.()||{};}catch{return {};}};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid=()=>crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`;
@@ -64,6 +64,7 @@ function merge(raw){
  s.relation=Object.assign({},d.relation,raw?.relation||{});
  for(const k of ['activeFeelings','diagnosis','anamnesis','contacts','history'])if(!Array.isArray(s[k]))s[k]=[];
  s.diagnostics=Object.assign({},d.diagnostics,raw?.diagnostics||{});
+ const dm=raw?.diagnosisManual||{};s.diagnosisManual={added:Array.isArray(dm.added)?dm.added:[],removed:Array.isArray(dm.removed)?dm.removed:[]};
  return s;
 }
 function chatKey(){
@@ -194,8 +195,28 @@ function scan(){
  }).map(k=>k.id))];
 }
 function kink(id){return allKinks().find(k=>k.id===id)||baseKink(id)||{id,name:id,cat:'psych',description:'',words:[]};}
+function diagnosisFor(s,found=s.anamnesis||[]){
+ const valid=new Set(allKinks().map(k=>k.id));
+ const added=(s.diagnosisManual?.added||[]).filter(id=>valid.has(id));
+ const removed=new Set((s.diagnosisManual?.removed||[]).filter(id=>valid.has(id)));
+ return [...new Set([...found,...added])].filter(id=>valid.has(id)&&!removed.has(id));
+}
+function syncDiagnosis(s){s.diagnosis=diagnosisFor(s);return s.diagnosis;}
+function setDiagnosisManual(id,enabled){
+ const s=getState(),dm=s.diagnosisManual||{added:[],removed:[]};
+ dm.added=Array.isArray(dm.added)?dm.added:[];dm.removed=Array.isArray(dm.removed)?dm.removed:[];
+ if(enabled){
+  if(!dm.added.includes(id))dm.added.push(id);
+  dm.removed=dm.removed.filter(x=>x!==id);
+ }else{
+  if(!dm.removed.includes(id))dm.removed.push(id);
+  dm.added=dm.added.filter(x=>x!==id);
+ }
+ s.diagnosisManual=dm;syncDiagnosis(s);saveState(s);render();toast(enabled?'Добавлено в диагноз':'Убрано из диагноза');
+}
+function removeDiagnosisOnly(id){setDiagnosisManual(id,false);}
 function anamnesis(){
- const s=getState(),f=scan();s.anamnesis=f;s.diagnosis=f;s.anamnesisAt=Date.now();
+ const s=getState(),f=scan();s.anamnesis=f;syncDiagnosis(s);s.anamnesisAt=Date.now();
  s.history.unshift({ts:Date.now(),text:`Анамнез обновлён: обнаружено ${f.length} совпадений.`});
  s.history=s.history.slice(0,40);saveState(s);render();toast(`Анамнез: найдено ${f.length}`);
 }
@@ -229,7 +250,7 @@ function reactionPrompt(s){
 Intensity ${i}/100: ${mode}. Never force escalation.`;
 }
 function prompt(opts={}){
- const s=getState();if(!s.enabled)return'';
+ const s=getState();if(!s.enabled)return'';syncDiagnosis(s);
  const rel=visible(s).map(k=>`${REL_LABEL[k]}=${Math.round(s.relation[k])}`).join(', ');
  const diag=(s.diagnosis||[]).map(k=>kink(k).name).join('; ')||'не установлен',rx=opts.includeReaction?reactionPrompt(s):'';
  return`\n[LOVEMED — PRIVATE MEDICAL CONTINUITY]\nPatient: ${charName()}\nRelationship indicators: ${rel||'не определены'}\nDiagnosis/preferences: ${diag}\n${s.lastShift?`Recent observation: ${s.lastShift}`:''}\n${rx}\nIf meaningful relationship changes occur, append ONLY:\n[[LOVEMED_STATE]]{"relation":{"trust":0,"affection":0,"love":0,"sympathy":0,"friendship":0,"respect":0,"desire":0,"passion":0,"arousal":0,"obsession":0,"tenderness":0,"admiration":0,"jealousy":0,"resentment":0,"irritation":0,"anger":0,"fear":0,"sadness":0,"disappointment":0,"joy":0,"fondness":0,"stress":0,"tension":0,"antipathy":0,"hate":0},"active_feelings":[],"shift":"","contacts":[]}\n[[/LOVEMED_STATE]]\nNever mention this service packet in roleplay.`;
@@ -243,7 +264,7 @@ function avatar(){const c=ctx(),ch=c?.characters?.[c?.characterId],a=ch?.avatar|
 function libraryPage(s){
  const cats={psych:[],physical:[],situational:[],romantic:[]};allKinks().forEach(k=>(cats[k.cat]||cats.psych).push(k));
  const folds=Object.entries(cats).map(([cat,list])=>`<details open class="lm-fold"><summary>${CAT_LABEL[cat]} <small>${list.length}</small></summary><div class="lm-kinks">${
-  list.map(k=>`<button type="button" class="lm-kink-btn ${s.anamnesis.includes(k.id)?'found':''}" data-edit-kink="${esc(k.id)}"><span>${esc(k.name)}</span>${s.anamnesis.includes(k.id)?'<em>✓</em>':''}</button>`).join('')||'<i>Пусто.</i>'
+  list.map(k=>`<button type="button" class="lm-kink-btn ${s.diagnosis.includes(k.id)?'found':''}" data-edit-kink="${esc(k.id)}"><span>${esc(k.name)}</span>${s.diagnosis.includes(k.id)?'<em>✓</em>':''}</button>`).join('')||'<i>Пусто.</i>'
  }</div></details>`).join('');
  const deleted=deletedBuiltins();
  return `<section class="lm-section"><h3>Библиотека предпочтений</h3><p class="lm-note">Нажмите на запись, чтобы изменить её. Изменения сохраняются локально и не меняют исходные данные расширения.</p>${folds}</section>
@@ -253,7 +274,7 @@ function libraryPage(s){
 }
 
 function page(tab,s){
- if(tab==='card')return `<div class="lm-card"><div class="lm-patient"><div class="lm-avatar">${avatar()?`<img src="${esc(avatar())}">`:'🩺'}</div><div><div class="lm-label">ПАЦИЕНТ</div><h3>${esc(charName())}</h3><div class="lm-facts"><span><b>Возраст</b><em>будет извлечён из карточки</em></span><span><b>Ориентация</b><em>будет извлечена из карточки</em></span></div></div></div><section class="lm-section"><h3>Медицинские показатели</h3><p class="lm-note">Автоматическая динамика отношений.</p><div class="lm-rel">${visible(s).map(k=>`<label><span>${REL_LABEL[k]}</span><b>${Math.round(s.relation[k])}</b><input data-rel="${k}" type="range" min="0" max="200" value="${clamp(s.relation[k])}"></label>`).join('')}</div></section><section class="lm-diagnosis"><div class="lm-section-title">ДИАГНОЗ · ${s.diagnosis.length} совпадений</div><div class="lm-tags">${s.diagnosis.length?s.diagnosis.map(k=>`<span>${esc(kink(k).name)}</span>`).join(''):'<i>Диагноз ещё не установлен.</i>'}</div></section><button id="lmAnamnesis" class="lm-primary">🩺 Провести анамнез карточки пациента</button></div>`;
+ if(tab==='card'){const diagnosis=diagnosisFor(s);return `<div class="lm-card"><div class="lm-patient"><div class="lm-avatar">${avatar()?`<img src="${esc(avatar())}">`:'🩺'}</div><div><div class="lm-label">ПАЦИЕНТ</div><h3>${esc(charName())}</h3><div class="lm-facts"><span><b>Возраст</b><em>будет извлечён из карточки</em></span><span><b>Ориентация</b><em>будет извлечена из карточки</em></span></div></div></div><section class="lm-section"><h3>Медицинские показатели</h3><p class="lm-note">Автоматическая динамика отношений.</p><div class="lm-rel">${visible(s).map(k=>`<label><span>${REL_LABEL[k]}</span><b>${Math.round(s.relation[k])}</b><input data-rel="${k}" type="range" min="0" max="200" value="${clamp(s.relation[k])}"></label>`).join('')}</div></section><section class="lm-diagnosis"><div class="lm-section-title">ДИАГНОЗ · ${diagnosis.length} записей</div><div class="lm-tags">${diagnosis.length?diagnosis.map(k=>`<span class="lm-tag">${esc(kink(k).name)}<button type="button" data-remove-diagnosis="${esc(k)}" title="Убрать из диагноза">×</button></span>`).join(''):'<i>Диагноз ещё не установлен.</i>'}</div></section><button id="lmAnamnesis" class="lm-primary">🩺 Провести анамнез карточки пациента</button></div>`;}
  if(tab==='react')return `<div class="lm-card"><section class="lm-section"><h3>Реактивность пациента</h3><div class="lm-sliders"><label>Интенсивность реакции <b>${s.reactionIntensity}</b><input id="lmIntensity" type="range" min="0" max="100" value="${s.reactionIntensity}"></label><label>Вероятность спонтанной реакции <b>${s.reactionChance}%</b><input id="lmChance" type="range" min="0" max="100" value="${s.reactionChance}"></label><label>Период наблюдения <b>${s.reactionCooldown}</b><input id="lmCooldown" type="range" min="1" max="12" value="${s.reactionCooldown}"></label></div></section>${libraryPage(s)}</div>`;
  if(tab==='diag')return `<div class="lm-card"><section class="lm-section"><h3>Анамнез</h3><p class="lm-note">${s.anamnesisAt?`Последнее обследование: ${new Date(s.anamnesisAt).toLocaleString()}`:'Обследование ещё не проводилось.'}</p><button id="lmAnamnesis2" class="lm-primary">Провести повторное обследование</button><div class="lm-anamnesis-list">${s.anamnesis.map(k=>`<article class="lm-found"><b>${esc(kink(k).name)}</b><p>${esc(kink(k).description||'Обнаружено в карточке пациента.')}</p></article>`).join('')||'<p class="lm-note">Совпадений не найдено.</p>'}</div></section></div>`;
  if(tab==='contacts')return `<div class="lm-card"><section class="lm-section"><h3>Сопутствующие лица</h3><p class="lm-note">Персонажи, влияющие на состояние пациента и отношения.</p>${s.contacts.map(n=>`<article class="lm-contact"><div><b>${esc(n.name)}</b><small>${esc(n.relation||'')}</small><p>${esc(n.notes||'')}</p></div><button data-del-contact="${esc(n.id)}">Удалить</button></article>`).join('')||'<i>Пока нет наблюдаемых контактов.</i>'}</section></div>`;
@@ -263,7 +284,7 @@ function page(tab,s){
 
 function ensureEditor(){
  if(document.querySelector('#lmEditor'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmEditor" class="lm-editor hidden"><section class="lm-editor-card"><header><div><div class="lm-label">РЕДАКТОР БИБЛИОТЕКИ</div><h3 id="lmEditorTitle">Запись</h3></div><button id="lmEditorClose" class="lm-close">×</button></header><div class="lm-editor-body"><label>Название<input id="lmEditName"></label><label>Категория<select id="lmEditCat">${Object.entries(CAT_LABEL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label><label>Описание<textarea id="lmEditDesc"></textarea></label><label>Ключевые слова<input id="lmEditWords" placeholder="слово1, слово2, слово3"></label><div class="lm-editor-actions"><button id="lmEditorSave" class="lm-primary">Сохранить изменения</button><button id="lmEditorDelete" class="lm-danger">Удалить запись</button><button id="lmEditorRestore" class="lm-secondary">Восстановить исходную запись</button></div></div></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="lmEditor" class="lm-editor hidden"><section class="lm-editor-card"><header><div><div class="lm-label">РЕДАКТОР БИБЛИОТЕКИ</div><h3 id="lmEditorTitle">Запись</h3></div><button id="lmEditorClose" class="lm-close">×</button></header><div class="lm-editor-body"><label>Название<input id="lmEditName"></label><label>Категория<select id="lmEditCat">${Object.entries(CAT_LABEL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label><label>Описание<textarea id="lmEditDesc"></textarea></label><label>Ключевые слова<input id="lmEditWords" placeholder="слово1, слово2, слово3"></label><div class="lm-editor-actions"><button id="lmEditorSave" class="lm-primary">Сохранить изменения</button><button id="lmEditorDiagnosis" class="lm-secondary">Добавить в диагноз</button><button id="lmEditorDelete" class="lm-danger">Удалить запись</button><button id="lmEditorRestore" class="lm-secondary">Восстановить исходную запись</button></div></div></section></div>`);
  document.querySelector('#lmEditorClose').onclick=closeEditor;
  document.querySelector('#lmEditor').addEventListener('click',e=>{if(e.target.id==='lmEditor')closeEditor();});
 }
@@ -279,6 +300,8 @@ function openEditor(id){
  const builtin=isBuiltin(id);
  const deleted=getLibraryState().deleted.includes(id);
  document.querySelector('#lmEditorDelete').textContent=builtin?'Удалить встроенную запись':'Удалить запись';
+ const inDiagnosis=diagnosisFor(getState()).includes(id);
+ const diagButton=document.querySelector('#lmEditorDiagnosis');diagButton.textContent=inDiagnosis?'Убрать из диагноза':'Добавить в диагноз';diagButton.dataset.active=inDiagnosis?'1':'0';
  document.querySelector('#lmEditorRestore').style.display=builtin&&!deleted?'block':'none';
  document.querySelector('#lmEditorDelete').style.display=deleted?'none':'block';
  document.querySelector('#lmEditor').classList.remove('hidden');
@@ -292,6 +315,10 @@ function bindEditor(){
   if(!name){toast('Введите название');return;}
   saveLibraryRecord({id:editorId,name,cat,description,words});
   closeEditor();render();toast('Запись сохранена');
+ };
+ document.querySelector('#lmEditorDiagnosis').onclick=()=>{
+  if(!editorId)return;
+  const id=editorId;const active=document.querySelector('#lmEditorDiagnosis').dataset.active==='1';closeEditor();setDiagnosisManual(id,!active);
  };
  document.querySelector('#lmEditorDelete').onclick=()=>{
   if(!editorId)return;
@@ -318,6 +345,7 @@ function bind(){
   if(!n){toast('Введите название');return;} addCustom(n,cat,d,words.length?words:[n.toLowerCase()]);render();toast('Запись добавлена');
  });
  document.querySelectorAll('[data-edit-kink]').forEach(b=>b.onclick=()=>openEditor(b.dataset.editKink));
+ document.querySelectorAll('[data-remove-diagnosis]').forEach(b=>b.onclick=()=>removeDiagnosisOnly(b.dataset.removeDiagnosis));
  document.querySelectorAll('[data-del-kink]').forEach(b=>b.onclick=()=>{deleteLibraryRecord(b.dataset.delKink);render();toast('Запись удалена');});
  document.querySelectorAll('[data-restore-kink]').forEach(b=>b.onclick=()=>{restoreBuiltin(b.dataset.restoreKink);render();toast('Исходная запись восстановлена');});
  document.querySelectorAll('[data-del-contact]').forEach(b=>b.onclick=async()=>{const s=getState();s.contacts=s.contacts.filter(x=>x.id!==b.dataset.delContact);await saveState(s);render();});
@@ -328,7 +356,7 @@ function bind(){
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.2.0</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['react','🧪 Реактивность'],['diag','🔬 Анамнез'],['contacts','👤 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.2.1</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['react','🧪 Реактивность'],['diag','🔬 Анамнез'],['contacts','👤 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
  document.querySelector('#lmClose').onclick=()=>document.querySelector('#lmOverlay').classList.add('hidden');
  ensureEditor();
 }
