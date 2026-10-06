@@ -1,7 +1,7 @@
 import { setExtensionPrompt, extension_prompt_types, eventSource, event_types } from '../../../../script.js';
 import { getContext } from '../../../extensions.js';
 
-const META_KEY='lovemed_state_v1', UI_KEY='lovemed_ui_v1', USER_CARD_KEY='lovemed_user_card_v1', LIBRARY_KEY='lovemed_library_v2', LEGACY_LIBRARY_KEY='lovemed_library_v1', REL_MAX=200;
+const META_KEY='lovemed_state_v1', UI_KEY='lovemed_ui_v1', USER_CARD_KEY='lovemed_user_card_v2', LIBRARY_KEY='lovemed_library_v2', LEGACY_LIBRARY_KEY='lovemed_library_v1', REL_MAX=200;
 
 const REL_FIELDS=[
 ['trust','Доверие'],['affection','Привязанность'],['love','Любовь'],['sympathy','Симпатия'],['friendship','Дружба'],['respect','Уважение'],
@@ -180,6 +180,16 @@ function charObject(){
  return c.characters?.[c.characterId] || c.character || c.currentCharacter || null;
 }
 function charName(){const ch=charObject();return ch?.name||ch?.data?.name||'{{char}}';}
+function extractProfileFields(text){
+ const raw=String(text||'');
+ const find=(patterns)=>{for(const re of patterns){const m=raw.match(re);if(m?.[1])return m[1].trim();}return '';};
+ return {
+  age:find([/(?:возраст|age)\s*[:\-–]?\s*(\d{1,3})/i,/\b(\d{1,3})\s*(?:лет|года|год)\b/i]),
+  sex:find([/(?:пол|sex)\s*[:\-–]?\s*([^\n,;]+)/i]),
+  gender:find([/(?:гендер|gender)\s*[:\-–]?\s*([^\n,;]+)/i]),
+  secondarySex:find([/(?:вторичн(?:ый|ая)\s+пол|secondary\s+sex|omegaverse\s+sex)\s*[:\-–]?\s*([^\n,;]+)/i])
+ };
+}
 function cardText(){
  const c=ctx(),ch=charObject();
  if(!c||!ch)return'';
@@ -195,7 +205,12 @@ function cardText(){
   Object.entries(v).forEach(([kk,vv])=>walk(vv,kk,d+1));
  }
  walk(ch,'character');
- return out.join('\n').toLowerCase();
+ return out.join('\n');
+}
+function charProfile(){
+ const ch=charObject(),text=cardText(),fields=extractProfileFields(text);
+ const a=ch?.avatar||ch?.data?.avatar||'';
+ return {name:charName(),age:fields.age,sex:fields.sex,gender:fields.gender,secondarySex:fields.secondarySex,avatar:a?`/characters/${encodeURIComponent(a)}`:''};
 }
 function scan(){
  const t=cardText();
@@ -287,11 +302,12 @@ function toast(t){const e=document.createElement('div');e.className='lm-toast';e
 function ui(){try{const u=Object.assign({showFab:true,x:null,y:120,tab:'card'},JSON.parse(localStorage.getItem(UI_KEY)||'{}'));if(u.tab==='diag')u.tab='user';return u;}catch{return{showFab:true,x:null,y:120,tab:'card'};}}
 function saveUI(x){try{localStorage.setItem(UI_KEY,JSON.stringify(x));}catch{}}
 const userCardDefaults=()=>({name:'',age:'',sex:'',gender:'',secondarySex:'',avatar:'',cycleHistory:'',ovulation:'',menstruation:'',pregnancy:'',children:'',notes:'',updatedAt:0});
-function getUserCard(){try{return Object.assign(userCardDefaults(),JSON.parse(localStorage.getItem(USER_CARD_KEY)||'{}'));}catch{return userCardDefaults();}}
-function saveUserCard(data){const x=Object.assign(userCardDefaults(),data||{},{updatedAt:Date.now()});try{localStorage.setItem(USER_CARD_KEY,JSON.stringify(x));}catch{}return x;}
+function userCardKey(){return `lovemed_user_card:${chatKey()}`;}
+function getUserCard(){try{return Object.assign(userCardDefaults(),JSON.parse(localStorage.getItem(userCardKey())||'{}'));}catch{return userCardDefaults();}}
+function saveUserCard(data){const x=Object.assign(userCardDefaults(),data||{},{updatedAt:Date.now()});try{localStorage.setItem(userCardKey(),JSON.stringify(x));}catch{}return x;}
 function userPersonaText(){
  const c=ctx(),out=[],seen=new WeakSet();
- const roots=[c?.name1,c?.userName,c?.persona,c?.userPersona,c?.personaDescription,c?.userPersonaDescription,c?.personaData,c?.user];
+ const roots=[c?.name1,c?.userName,c?.persona,c?.userPersona,c?.personaDescription,c?.userPersonaDescription,c?.personaData,c?.user,document.querySelector('#persona_description')?.value,document.querySelector('#your_name')?.value];
  function walk(v,d=0){
   if(d>5||v==null)return;
   if(typeof v==='string'){if(v.trim()&&v.length<30000)out.push(v.trim());return;}
@@ -304,49 +320,51 @@ function userPersonaText(){
 }
 function userPersonaAvatar(){
  const c=ctx(),roots=[c?.userAvatar,c?.user_avatar,c?.persona?.avatar,c?.user?.avatar,c?.personaData?.avatar];
- const a=roots.find(x=>typeof x==='string'&&x.trim());return a?String(a):'';
+ const direct=roots.find(x=>typeof x==='string'&&x.trim());
+ if(direct)return String(direct);
+ const img=document.querySelector('#user_avatar_block .avatar-container .avatar.selected img') || document.querySelector('#user_avatar_block .avatar.selected img');
+ return img?.currentSrc||img?.src||'';
 }
-function extractUserFields(text){
- const raw=String(text||'');
- const find=(patterns)=>{for(const re of patterns){const m=raw.match(re);if(m?.[1])return m[1].trim();}return '';};
- const age=find([/(?:возраст|age)\s*[:\-–]?\s*(\d{1,3})/i,/\bмне\s+(\d{1,3})\s*(?:лет|год|года)?\b/i,/\bi['’]?m\s+(\d{1,3})\b/i]);
- const sex=find([/(?:пол|sex)\s*[:\-–]?\s*([^\n,;]+)/i]);
- const gender=find([/(?:гендер|gender)\s*[:\-–]?\s*([^\n,;]+)/i]);
- const secondary=find([/(?:вторичн(?:ый|ая)\s+пол|secondary\s+sex|omegaverse\s+sex)\s*[:\-–]?\s*([^\n,;]+)/i]);
- return {age,sex,gender,secondarySex:secondary};
-}
+function extractUserFields(text){return extractProfileFields(text);}
 function refreshUserCardFromPersona(){
  const current=getUserCard(),text=userPersonaText(),parsed=extractUserFields(text);
- if(!current.name){const c=ctx();current.name=String(c?.name1||c?.userName||'').trim();}
+ if(!current.name){const c=ctx();current.name=String(c?.name1||c?.userName||document.querySelector('#your_name')?.value||'').trim();}
  for(const [k,v] of Object.entries(parsed))if(!current[k]&&v)current[k]=v;
  if(!current.avatar){const a=userPersonaAvatar();if(a)current.avatar=a;}
  return saveUserCard(current);
 }
+function userAvatarUrl(value){
+ const v=String(value||'').trim();
+ if(!v)return'';
+ if(/^data:/i.test(v)||/^https?:\/\//i.test(v)||v.startsWith('/'))return v;
+ return `/User Avatars/${encodeURIComponent(v)}`;
+}
 function userCardPage(){
- const u=refreshUserCardFromPersona();
- const av=u.avatar?(u.avatar.startsWith('http')||u.avatar.startsWith('/')||u.avatar.startsWith('data:')?u.avatar:`/User Avatars/${encodeURIComponent(u.avatar)}`):'';
+ const u=refreshUserCardFromPersona(),av=userAvatarUrl(u.avatar);
  return `<div class="lm-card lm-user-card">
    <div class="lm-id-head"><div class="lm-label">PERSONAL MEDICAL ID · {{user}}</div><span class="lm-id-chip">USER</span></div>
-   <div class="lm-user-id"><div class="lm-user-avatar">${av?`<img src="${esc(av)}">`:'👤'}</div><div class="lm-user-main"><div class="lm-label">ПАЦИЕНТ</div><h3>${esc(u.name||'{{user}}')}</h3><p>Личная медицинская карточка</p></div></div>
-   <section class="lm-section"><h3>Основные данные</h3><div class="lm-user-grid">
+   <div class="lm-user-id"><div class="lm-user-avatar">${av?`<img src="${esc(av)}">`:'👤'}</div><div class="lm-user-main"><div class="lm-label">ПАЦИЕНТ</div><h3>${esc(u.name||'{{user}}')}</h3><p>Карта пользователя этого чата</p></div></div>
+   <section class="lm-section lm-compact-section"><div class="lm-section-title">ОСНОВНЫЕ ДАННЫЕ</div><div class="lm-user-grid">
     <label>Имя<input id="lmUserName" value="${esc(u.name)}" placeholder="Имя"></label><label>Возраст<input id="lmUserAge" value="${esc(u.age)}" placeholder="Не указан"></label>
     <label>Пол<input id="lmUserSex" value="${esc(u.sex)}" placeholder="Не указан"></label><label>Гендер<input id="lmUserGender" value="${esc(u.gender)}" placeholder="Не указан"></label>
-    <label>Вторичный пол<input id="lmUserSecondary" value="${esc(u.secondarySex)}" placeholder="Не указан"></label><label>Аватар / файл<input id="lmUserAvatar" value="${esc(u.avatar)}" placeholder="Имя файла аватара"></label>
-   </div><button id="lmSaveUserCard" class="lm-primary">Сохранить данные пользователя</button><button id="lmRefreshUserCard" class="lm-secondary">Обновить из персоны</button></section>
-   <section class="lm-section"><h3>История</h3><p class="lm-note">Поля можно заполнить вручную. LoveMed не придумывает медицинские данные.</p><div class="lm-user-history">
-    <label>История менструального цикла<textarea id="lmUserCycle" placeholder="Циклы, даты, длительность...">${esc(u.cycleHistory)}</textarea></label><label>Овуляция<textarea id="lmUserOvulation" placeholder="Даты или заметки...">${esc(u.ovulation)}</textarea></label>
-    <label>Менструация<textarea id="lmUserMenstruation" placeholder="Даты, длительность, особенности...">${esc(u.menstruation)}</textarea></label><label>Беременность<textarea id="lmUserPregnancy" placeholder="История беременностей...">${esc(u.pregnancy)}</textarea></label>
-    <label>Дети<textarea id="lmUserChildren" placeholder="Имя, пол, возраст и другие данные...">${esc(u.children)}</textarea></label><label>Дополнительные заметки<textarea id="lmUserNotes" placeholder="Любые важные сведения...">${esc(u.notes)}</textarea></label>
-   </div><button id="lmSaveUserHistory" class="lm-primary">Сохранить историю</button></section>
+    <label>Вторичный пол<input id="lmUserSecondary" value="${esc(u.secondarySex)}" placeholder="Не указан"></label><label>Аватар<input id="lmUserAvatar" value="${esc(u.avatar)}" placeholder="Автоматически из персоны"></label>
+   </div><div class="lm-button-row"><button id="lmSaveUserCard" type="button" class="lm-primary lm-small-button">Сохранить</button><button id="lmRefreshUserCard" type="button" class="lm-secondary lm-small-button">Обновить из персоны</button></div></section>
+   <section class="lm-section lm-compact-section"><div class="lm-section-title">ИСТОРИЯ</div><div class="lm-user-history lm-history-grid">
+    <label>Менструальный цикл<textarea id="lmUserCycle" placeholder="Циклы, даты, длительность...">${esc(u.cycleHistory)}</textarea></label><label>Овуляция<textarea id="lmUserOvulation" placeholder="Даты или заметки...">${esc(u.ovulation)}</textarea></label>
+    <label>Менструация<textarea id="lmUserMenstruation" placeholder="Даты, длительность...">${esc(u.menstruation)}</textarea></label><label>Беременность<textarea id="lmUserPregnancy" placeholder="История беременностей...">${esc(u.pregnancy)}</textarea></label>
+    <label>Дети<textarea id="lmUserChildren" placeholder="Имя, пол, возраст...">${esc(u.children)}</textarea></label><label>Заметки<textarea id="lmUserNotes" placeholder="Дополнительные сведения...">${esc(u.notes)}</textarea></label>
+   </div><button id="lmSaveUserHistory" type="button" class="lm-primary lm-small-button">Сохранить историю</button></section>
   </div>`;
 }
+function collectUserIdentity(){return {name:document.querySelector('#lmUserName')?.value.trim()||'',age:document.querySelector('#lmUserAge')?.value.trim()||'',sex:document.querySelector('#lmUserSex')?.value.trim()||'',gender:document.querySelector('#lmUserGender')?.value.trim()||'',secondarySex:document.querySelector('#lmUserSecondary')?.value.trim()||'',avatar:document.querySelector('#lmUserAvatar')?.value.trim()||''};}
+function saveUserIdentity(){saveUserCard(Object.assign(getUserCard(),collectUserIdentity()));render();toast('Данные пользователя сохранены');}
+function saveUserHistory(){saveUserCard(Object.assign(getUserCard(),{cycleHistory:document.querySelector('#lmUserCycle')?.value.trim()||'',ovulation:document.querySelector('#lmUserOvulation')?.value.trim()||'',menstruation:document.querySelector('#lmUserMenstruation')?.value.trim()||'',pregnancy:document.querySelector('#lmUserPregnancy')?.value.trim()||'',children:document.querySelector('#lmUserChildren')?.value.trim()||'',notes:document.querySelector('#lmUserNotes')?.value.trim()||''}));render();toast('История пользователя сохранена');}
 function bindUserCard(){
- const collect=()=>({name:document.querySelector('#lmUserName')?.value.trim()||'',age:document.querySelector('#lmUserAge')?.value.trim()||'',sex:document.querySelector('#lmUserSex')?.value.trim()||'',gender:document.querySelector('#lmUserGender')?.value.trim()||'',secondarySex:document.querySelector('#lmUserSecondary')?.value.trim()||'',avatar:document.querySelector('#lmUserAvatar')?.value.trim()||''});
- document.querySelector('#lmSaveUserCard')?.addEventListener('click',()=>{saveUserCard(Object.assign(getUserCard(),collect()));render();toast('Данные пользователя сохранены');});
+ document.querySelector('#lmSaveUserCard')?.addEventListener('click',saveUserIdentity);
  document.querySelector('#lmRefreshUserCard')?.addEventListener('click',()=>{refreshUserCardFromPersona();render();toast('Данные обновлены из персоны');});
- document.querySelector('#lmSaveUserHistory')?.addEventListener('click',()=>{saveUserCard(Object.assign(getUserCard(),{cycleHistory:document.querySelector('#lmUserCycle')?.value.trim()||'',ovulation:document.querySelector('#lmUserOvulation')?.value.trim()||'',menstruation:document.querySelector('#lmUserMenstruation')?.value.trim()||'',pregnancy:document.querySelector('#lmUserPregnancy')?.value.trim()||'',children:document.querySelector('#lmUserChildren')?.value.trim()||'',notes:document.querySelector('#lmUserNotes')?.value.trim()||''}));toast('История пользователя сохранена');});
+ document.querySelector('#lmSaveUserHistory')?.addEventListener('click',saveUserHistory);
 }
-function avatar(){const c=ctx(),ch=c?.characters?.[c?.characterId],a=ch?.avatar||ch?.data?.avatar;return a?`/characters/${encodeURIComponent(a)}`:'';}
+function avatar(){return charProfile().avatar;}
 
 function libraryPage(s){
  const cats={psych:[],physical:[],situational:[],romantic:[]};allKinks().forEach(k=>(cats[k.cat]||cats.psych).push(k));
@@ -362,8 +380,18 @@ function libraryPage(s){
 
 function page(tab,s){
  if(tab==='user')return userCardPage();
- if(tab==='card'){const diagnosis=diagnosisFor(s);return `<div class="lm-card"><div class="lm-patient"><div class="lm-avatar">${avatar()?`<img src="${esc(avatar())}">`:'🩺'}</div><div><div class="lm-label">ПАЦИЕНТ</div><h3>${esc(charName())}</h3><div class="lm-facts"><span><b>Анамнез</b><em>${s.anamnesisAt?`обновлён ${new Date(s.anamnesisAt).toLocaleString()}`:'ещё не проводился'}</em></span><span><b>Совпадений</b><em>${s.anamnesis?.length||0}</em></span></div></div></div><section class="lm-section"><h3>Медицинские показатели</h3><p class="lm-note">Автоматическая динамика отношений.</p><div class="lm-rel">${visible(s).map(k=>`<label><span>${REL_LABEL[k]}</span><b>${Math.round(s.relation[k])}</b><input data-rel="${k}" type="range" min="0" max="200" value="${clamp(s.relation[k])}"></label>`).join('')}</div></section><section class="lm-diagnosis"><div class="lm-section-title">ДИАГНОЗ · ${diagnosis.length} записей</div><div class="lm-tags">${diagnosis.length?diagnosis.map(k=>`<span class="lm-tag">${esc(kink(k).name)}<button type="button" data-remove-diagnosis="${esc(k)}" title="Убрать из диагноза">×</button></span>`).join(''):'<i>Диагноз ещё не установлен.</i>'}</div></section><button id="lmAnamnesis" class="lm-primary">🩺 Провести анамнез карточки пациента</button></div>`;}
- if(tab==='react')return `<div class="lm-card"><section class="lm-section"><h3>Реактивность пациента</h3><div class="lm-sliders"><label>Интенсивность реакции <b>${s.reactionIntensity}</b><input id="lmIntensity" type="range" min="0" max="100" value="${s.reactionIntensity}"></label><label>Вероятность спонтанной реакции <b>${s.reactionChance}%</b><input id="lmChance" type="range" min="0" max="100" value="${s.reactionChance}"></label><label>Период наблюдения <b>${s.reactionCooldown}</b><input id="lmCooldown" type="range" min="1" max="12" value="${s.reactionCooldown}"></label></div></section>${libraryPage(s)}</div>`;
+ if(tab==='card'){
+  const diagnosis=diagnosisFor(s),cp=charProfile(),field=(label,value)=>`<div class="lm-info-tile"><span>${label}</span><b>${esc(value||'Не указано')}</b></div>`;
+  return `<div class="lm-card lm-char-card">
+   <div class="lm-id-head"><div class="lm-label">PATIENT MEDICAL RECORD · {{char}}</div><span class="lm-id-chip">CHAR</span></div>
+   <div class="lm-user-id lm-char-id"><div class="lm-avatar">${cp.avatar?`<img src="${esc(cp.avatar)}">`:'🩺'}</div><div class="lm-user-main"><div class="lm-label">ПАЦИЕНТ</div><h3>${esc(cp.name)}</h3><p>Карточка текущего персонажа</p></div></div>
+   <section class="lm-section lm-compact-section"><div class="lm-section-title">ОСНОВНЫЕ ДАННЫЕ</div><div class="lm-info-grid">${field('Возраст',cp.age)}${field('Пол',cp.sex)}${field('Гендер',cp.gender)}${field('Вторичный пол',cp.secondarySex)}</div></section>
+   <section class="lm-section lm-compact-section"><div class="lm-section-title">МЕДИЦИНСКИЕ ПОКАЗАТЕЛИ</div><div class="lm-rel">${visible(s).map(k=>`<label><span>${REL_LABEL[k]}</span><b>${Math.round(s.relation[k])}</b><input data-rel="${k}" type="range" min="0" max="200" value="${clamp(s.relation[k])}"></label>`).join('')}</div></section>
+   <section class="lm-diagnosis lm-compact-diagnosis"><div class="lm-section-title">ДИАГНОЗ</div><div class="lm-tags">${diagnosis.length?diagnosis.map(k=>`<span class="lm-tag">${esc(kink(k).name)}<button type="button" data-remove-diagnosis="${esc(k)}" title="Убрать из диагноза">×</button></span>`).join(''):'<i>Пока не установлен.</i>'}</div></section>
+   <button id="lmAnamnesis" type="button" class="lm-primary lm-anamnesis-button">🩺 Провести анамнез карточки пациента</button>
+  </div>`;
+}
+if(tab==='react')return `<div class="lm-card"><section class="lm-section"><h3>Реактивность пациента</h3><div class="lm-sliders"><label>Интенсивность реакции <b>${s.reactionIntensity}</b><input id="lmIntensity" type="range" min="0" max="100" value="${s.reactionIntensity}"></label><label>Вероятность спонтанной реакции <b>${s.reactionChance}%</b><input id="lmChance" type="range" min="0" max="100" value="${s.reactionChance}"></label><label>Период наблюдения <b>${s.reactionCooldown}</b><input id="lmCooldown" type="range" min="1" max="12" value="${s.reactionCooldown}"></label></div></section>${libraryPage(s)}</div>`;
  if(tab==='contacts')return `<div class="lm-card"><section class="lm-section"><h3>Сопутствующие лица</h3><p class="lm-note">Персонажи, влияющие на состояние пациента и отношения.</p>${s.contacts.map(n=>`<article class="lm-contact"><div><b>${esc(n.name)}</b><small>${esc(n.relation||'')}</small><p>${esc(n.notes||'')}</p></div><button data-del-contact="${esc(n.id)}">Удалить</button></article>`).join('')||'<i>Пока нет наблюдаемых контактов.</i>'}</section></div>`;
  if(tab==='history')return `<div class="lm-card"><section class="lm-section"><h3>История наблюдений</h3>${s.history.slice(0,20).map(x=>`<article class="lm-history"><time>${new Date(x.ts).toLocaleString()}</time><span>${esc(x.text)}</span></article>`).join('')||'<i>История пока пуста.</i>'}</section></div>`;
  return `<div class="lm-card"><section class="lm-section"><h3>Служебная диагностика</h3><label class="lm-check"><input id="lmEnabled" type="checkbox" ${s.enabled?'checked':''}> Включить LoveMed</label><label class="lm-check"><input id="lmAutoTrack" type="checkbox" ${s.autoTrack?'checked':''}> Автоматически обновлять показатели</label><label class="lm-check"><input id="lmAutoReaction" type="checkbox" ${s.autoReaction?'checked':''}> Разрешить спонтанные реакции</label><p class="lm-note">${esc(s.diagnostics.lastParseStatus)}</p><button id="lmParse" class="lm-secondary">Проверить последний ответ модели</button><label class="lm-check"><input id="lmFab" type="checkbox" ${ui().showFab?'checked':''}> Показывать плавающую кнопку</label></section></div>`;
@@ -452,23 +480,25 @@ function bind(){
  document.querySelectorAll('[data-del-contact]').forEach(b=>b.onclick=async()=>{const st=getState();st.contacts=st.contacts.filter(x=>x.id!==b.dataset.delContact);await saveState(st);render();});
  [['#lmEnabled','enabled'],['#lmAutoTrack','autoTrack'],['#lmAutoReaction','autoReaction']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('change',async e=>{const st=getState();st[k]=e.target.checked;await saveState(st);}));
  document.querySelector('#lmParse')?.addEventListener('click',()=>toast(parseLatest()?'Пакет принят ✓':'Пакет не найден'));
- if(ui().tab==='user')bindUserCard();
  document.querySelector('#lmFab')?.addEventListener('change',e=>{const u=ui();u.showFab=e.target.checked;saveUI(u);syncFab();});
 }
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.3.0</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.3.1</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
  document.querySelector('#lmClose').onclick=()=>{editorId=null;document.querySelector('#lmOverlay').classList.add('hidden');};
  const overlay=document.querySelector('#lmOverlay');
  if(overlay&&!overlay.dataset.lovemedDelegated){
   overlay.dataset.lovemedDelegated='1';
   overlay.addEventListener('click',e=>{
-   const btn=e.target.closest?.('#lmAnamnesis, #lmAnamnesis2');
+   const btn=e.target.closest?.('#lmAnamnesis, #lmAnamnesis2, #lmSaveUserCard, #lmRefreshUserCard, #lmSaveUserHistory');
    if(!btn)return;
    e.preventDefault();
    e.stopPropagation();
-   anamnesis();
+   if(btn.id==='lmAnamnesis'||btn.id==='lmAnamnesis2'){anamnesis();return;}
+   if(btn.id==='lmSaveUserCard'){saveUserIdentity();return;}
+   if(btn.id==='lmRefreshUserCard'){refreshUserCardFromPersona();render();toast('Данные обновлены из персоны');return;}
+   if(btn.id==='lmSaveUserHistory'){saveUserHistory();return;}
   });
  }
 }
