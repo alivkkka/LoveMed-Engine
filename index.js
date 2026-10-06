@@ -174,24 +174,35 @@ function addCustom(name,cat,description,words){
 }
 function deletedBuiltins(){return getLibraryState().deleted.map(baseKink).filter(Boolean);}
 
-function charName(){const c=ctx(),ch=c?.characters?.[c?.characterId];return ch?.name||ch?.data?.name||'{{char}}';}
+function charObject(){
+ const c=ctx();
+ if(!c||c.groupId)return null;
+ return c.characters?.[c.characterId] || c.character || c.currentCharacter || null;
+}
+function charName(){const ch=charObject();return ch?.name||ch?.data?.name||'{{char}}';}
 function cardText(){
- const c=ctx();if(!c||c.groupId)return'';const ch=c.characters?.[c.characterId];if(!ch)return'';
- const out=[],seen=new WeakSet(),skip=/^(avatar|image|thumbnail|chat|date_last_chat|create_date)$/i;
+ const c=ctx(),ch=charObject();
+ if(!c||!ch)return'';
+ const out=[],seen=new WeakSet();
+ const skip=/^(avatar|image|thumbnail|chat|date_last_chat|create_date|mes|messages)$/i;
+ const important=/^(name|description|personality|scenario|first_mes|mes_example|creator_notes|system_prompt|post_history_instructions|tags|personality_prompt)$/i;
  function walk(v,k='',d=0){
-  if(d>5||v==null||skip.test(k))return;
-  if(typeof v==='string'){if(v.trim()&&v.length<50000)out.push(v.trim());return;}
+  if(d>8||v==null)return;
+  if(typeof v==='string'){if(v.trim()&&v.length<100000)out.push(v.trim());return;}
   if(typeof v!=='object'||seen.has(v))return;seen.add(v);
-  if(Array.isArray(v)){v.slice(0,150).forEach(x=>walk(x,k,d+1));return;}
+  if(skip.test(k)&&!important.test(k))return;
+  if(Array.isArray(v)){v.slice(0,250).forEach(x=>walk(x,k,d+1));return;}
   Object.entries(v).forEach(([kk,vv])=>walk(vv,kk,d+1));
  }
- walk(ch,'character');return out.join('\n').toLowerCase();
+ walk(ch,'character');
+ return out.join('\n').toLowerCase();
 }
 function scan(){
- const t=cardText();if(!t)return[];
+ const t=cardText();
+ if(!t)return[];
  return [...new Set(allKinks().filter(k=>{
   const terms=[k.name,...(k.words||[])].filter(Boolean).map(String);
-  return terms.some(w=>t.includes(w.toLowerCase()));
+  return terms.some(w=>w.length>1&&t.includes(w.toLowerCase()));
  }).map(k=>k.id))];
 }
 function kink(id){return allKinks().find(k=>k.id===id)||baseKink(id)||{id,name:id,cat:'psych',description:'',words:[]};}
@@ -216,9 +227,20 @@ function setDiagnosisManual(id,enabled){
 }
 function removeDiagnosisOnly(id){setDiagnosisManual(id,false);}
 function anamnesis(){
- const s=getState(),f=scan();s.anamnesis=f;syncDiagnosis(s);s.anamnesisAt=Date.now();
- s.history.unshift({ts:Date.now(),text:`Анамнез обновлён: обнаружено ${f.length} совпадений.`});
- s.history=s.history.slice(0,40);saveState(s);render();toast(`Анамнез: найдено ${f.length}`);
+ try{
+  const s=getState(),f=scan();
+  s.anamnesis=f;
+  syncDiagnosis(s);
+  s.anamnesisAt=Date.now();
+  s.history.unshift({ts:Date.now(),text:`Анамнез обновлён: обнаружено ${f.length} совпадений.`});
+  s.history=s.history.slice(0,40);
+  saveState(s);
+  render();
+  toast(f.length?`Анализ завершён: найдено ${f.length}`:'Анализ завершён: совпадений не найдено');
+ }catch(err){
+  console.error('[LoveMed] Card scan failed:',err);
+  toast('Не удалось просканировать карточку. Проверьте консоль SillyTavern.');
+ }
 }
 function visible(s){
  const a=(s.activeFeelings||[]).filter(k=>REL_LABEL[k]);
@@ -372,7 +394,7 @@ function bind(){
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.2.1</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['react','🧪 Реактивность'],['diag','🔬 Анамнез'],['contacts','👤 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.2.2</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['react','🧪 Реактивность'],['diag','🔬 Анамнез'],['contacts','👤 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
  document.querySelector('#lmClose').onclick=()=>{editorId=null;document.querySelector('#lmOverlay').classList.add('hidden');};
 }
 function open(){ensurePanel();document.querySelector('#lmOverlay').classList.remove('hidden');render();}
