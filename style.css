@@ -48,4 +48,12 @@
  .lm-panel{width:100vw}.lm-head{padding:13px}.lm-head h2{font-size:23px}.lm-tabs{padding:7px}.lm-tabs button{font-size:12px;padding:8px}
  .lm-card{padding:13px;border-radius:15px}.lm-rel{grid-template-columns:1fr}.lm-kinks{grid-template-columns:1fr}.lm-avatar{width:82px;height:100px}.lm-fab{width:42px;height:42px}#lmBody{padding:9px}
  .lm-deleted-row{align-items:flex-start;flex-direction:column}.lm-deleted-row .lm-small{width:100%}
-                            }
+}
+
+/* v0.2.1 stability/layout patch: keep the original compact two-column library. */
+.lm-panel{width:min(560px,92vw)}
+.lm-kinks{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:600px){
+  .lm-panel{width:min(560px,100vw)}
+  .lm-kinks{grid-template-columns:repeat(2,minmax(0,1fr))}
+                                                  }
