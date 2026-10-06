@@ -68,27 +68,15 @@
 .lm-editor-actions button{width:100%;padding:8px 10px;border-radius:10px}
 @media(max-width:600px){.lm-panel{width:min(560px,92vw);max-width:560px}.lm-kinks{display:flex;flex-wrap:wrap}.lm-kink-btn{max-width:100%}}
 
-/* v0.2.2 final UI rules: keep the original two-column library layout and rounded controls. */
+/* v0.2.4 UI: restore compact pill-style preference buttons and keep all controls rounded. */
 .lm-overlay button,
 .lm-overlay input,
 .lm-overlay textarea,
 .lm-overlay select{border-radius:12px !important;}
 .lm-panel{width:min(560px,92vw);max-width:560px;}
 .lm-tabs{gap:6px;}
-.lm-tabs button{border-radius:12px !important;}
-.lm-kinks{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:8px !important;padding-top:10px;}
-.lm-kink-btn{width:100% !important;max-width:none !important;min-height:38px;display:flex !important;align-items:center;justify-content:space-between;padding:8px 11px;border-radius:14px !important;white-space:normal;}
-.lm-custom-row>button:last-child{border-radius:12px !important;}
-.lm-primary,.lm-secondary,.lm-danger{border-radius:12px !important;}
-.lm-close{border-radius:12px !important;}
-@media(max-width:600px){
- .lm-panel{width:min(560px,92vw);max-width:560px;}
- .lm-kinks{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}
- .lm-kink-btn{width:100% !important;}
-}
-
-
-/* v0.2.3 — restore the original preference-chip layout */
+.lm-tabs button{border-radius:999px !important;}
+.lm-primary,.lm-secondary,.lm-danger,.lm-close{border-radius:999px !important;}
 .lm-kinks{
   display:flex !important;
   flex-wrap:wrap !important;
@@ -105,25 +93,17 @@
   align-items:center !important;
   justify-content:flex-start !important;
   gap:7px !important;
-  padding:7px 11px !important;
+  padding:7px 12px !important;
   border-radius:999px !important;
   white-space:normal !important;
   text-align:left !important;
   box-sizing:border-box !important;
 }
-.lm-kink-btn span{
-  padding:0 !important;
-  border:0 !important;
-  background:transparent !important;
-}
-.lm-overlay button,
-.lm-overlay input,
-.lm-overlay textarea,
-.lm-overlay select{
-  border-radius:12px !important;
-}
-.lm-kink-btn{border-radius:999px !important;}
+.lm-kink-btn span{padding:0 !important;border:0 !important;background:transparent !important;}
+.lm-kink-btn:hover{border-radius:999px !important;}
+.lm-custom-row>button:last-child{border-radius:999px !important;}
 @media(max-width:600px){
+  .lm-panel{width:min(560px,92vw);max-width:560px;}
   .lm-kinks{display:flex !important;flex-wrap:wrap !important;}
   .lm-kink-btn{width:auto !important;max-width:100% !important;}
-}
+        }
