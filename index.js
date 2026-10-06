@@ -282,109 +282,98 @@ function page(tab,s){
  return `<div class="lm-card"><section class="lm-section"><h3>Служебная диагностика</h3><label class="lm-check"><input id="lmEnabled" type="checkbox" ${s.enabled?'checked':''}> Включить LoveMed</label><label class="lm-check"><input id="lmAutoTrack" type="checkbox" ${s.autoTrack?'checked':''}> Автоматически обновлять показатели</label><label class="lm-check"><input id="lmAutoReaction" type="checkbox" ${s.autoReaction?'checked':''}> Разрешить спонтанные реакции</label><p class="lm-note">${esc(s.diagnostics.lastParseStatus)}</p><button id="lmParse" class="lm-secondary">Проверить последний ответ модели</button><label class="lm-check"><input id="lmFab" type="checkbox" ${ui().showFab?'checked':''}> Показывать плавающую кнопку</label></section></div>`;
 }
 
-function ensureEditor(){
- if(document.querySelector('#lmEditor'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmEditor" class="lm-editor hidden"><section class="lm-editor-card"><header><div><div class="lm-label">РЕДАКТОР БИБЛИОТЕКИ</div><h3 id="lmEditorTitle">Запись</h3></div><button id="lmEditorClose" class="lm-close">×</button></header><div class="lm-editor-body"><label>Название<input id="lmEditName"></label><label>Категория<select id="lmEditCat">${Object.entries(CAT_LABEL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label><label>Описание<textarea id="lmEditDesc"></textarea></label><label>Ключевые слова<input id="lmEditWords" placeholder="слово1, слово2, слово3"></label><div class="lm-editor-actions"><button id="lmEditorSave" class="lm-primary">Сохранить изменения</button><button id="lmEditorDiagnosis" class="lm-secondary">Добавить в диагноз</button><button id="lmEditorDelete" class="lm-danger">Удалить запись</button><button id="lmEditorRestore" class="lm-secondary">Восстановить исходную запись</button></div></div></section></div>`);
- document.querySelector('#lmEditorClose').onclick=closeEditor;
- document.querySelector('#lmEditor').addEventListener('click',e=>{if(e.target.id==='lmEditor')closeEditor();});
+function editorPage(k,s){
+ const builtin=isBuiltin(k.id), deleted=getLibraryState().deleted.includes(k.id), inDiagnosis=diagnosisFor(s).includes(k.id);
+ return `<div class="lm-card lm-editor-inline">
+   <header class="lm-inline-head"><div><div class="lm-label">РЕДАКТОР БИБЛИОТЕКИ</div><h3>${esc(k.name)}</h3></div><button type="button" id="lmEditorClose" class="lm-close lm-inline-close">×</button></header>
+   <div class="lm-editor-body">
+    <label>Название<input id="lmEditName" value="${esc(k.name||'')}"></label>
+    <label>Категория<select id="lmEditCat">${Object.entries(CAT_LABEL).map(([x,v])=>`<option value="${x}" ${x===(k.cat||'psych')?'selected':''}>${v}</option>`).join('')}</select></label>
+    <label>Описание<textarea id="lmEditDesc">${esc(k.description||'')}</textarea></label>
+    <label>Ключевые слова<input id="lmEditWords" value="${esc((k.words||[]).join(', '))}" placeholder="слово1, слово2, слово3"></label>
+    <div class="lm-editor-actions">
+      <button type="button" id="lmEditorSave" class="lm-primary">Сохранить изменения</button>
+      <button type="button" id="lmEditorDiagnosis" class="lm-secondary">${inDiagnosis?'Убрать из диагноза':'Добавить в диагноз'}</button>
+      <button type="button" id="lmEditorDelete" class="lm-danger" ${deleted?'style="display:none"':''}>${builtin?'Удалить встроенную запись':'Удалить запись'}</button>
+      <button type="button" id="lmEditorRestore" class="lm-secondary" ${builtin&&!deleted?'':'style="display:none"'}>Восстановить исходную запись</button>
+    </div>
+   </div>
+ </div>`;
 }
+
 let editorId=null;
 function openEditor(id){
- const k=allKinks().find(x=>x.id===id)||getLibraryState().custom.find(x=>x.id===id);if(!k)return;
- editorId=id;ensureEditor();
- document.querySelector('#lmEditorTitle').textContent=k.name;
- document.querySelector('#lmEditName').value=k.name||'';
- document.querySelector('#lmEditCat').value=k.cat||'psych';
- document.querySelector('#lmEditDesc').value=k.description||'';
- document.querySelector('#lmEditWords').value=(k.words||[]).join(', ');
- const builtin=isBuiltin(id);
- const deleted=getLibraryState().deleted.includes(id);
- document.querySelector('#lmEditorDelete').textContent=builtin?'Удалить встроенную запись':'Удалить запись';
- const inDiagnosis=diagnosisFor(getState()).includes(id);
- const diagButton=document.querySelector('#lmEditorDiagnosis');if(diagButton){diagButton.textContent=inDiagnosis?'Убрать из диагноза':'Добавить в диагноз';diagButton.dataset.active=inDiagnosis?'1':'0';}
- document.querySelector('#lmEditorRestore').style.display=builtin&&!deleted?'block':'none';
- document.querySelector('#lmEditorDelete').style.display=deleted?'none':'block';
- document.querySelector('#lmEditor').classList.remove('hidden');
+ const k=allKinks().find(x=>x.id===id)||getLibraryState().custom.find(x=>x.id===id);
+ if(!k)return;
+ editorId=id;
+ render();
+ requestAnimationFrame(()=>document.querySelector('#lmBody')?.scrollTo({top:0,behavior:'instant'}));
 }
-function closeEditor(){editorId=null;document.querySelector('#lmEditor')?.classList.add('hidden');}
+function closeEditor(){editorId=null;render();}
 function bindEditor(){
- const editor=document.querySelector('#lmEditor');
- if(!editor||editor.dataset.bound==='1')return;
- editor.dataset.bound='1';
- document.querySelector('#lmEditorSave').onclick=()=>{
+ document.querySelector('#lmEditorClose')?.addEventListener('click',closeEditor);
+ document.querySelector('#lmEditorSave')?.addEventListener('click',()=>{
   if(!editorId)return;
-  const name=document.querySelector('#lmEditName').value.trim(),cat=document.querySelector('#lmEditCat').value,description=document.querySelector('#lmEditDesc').value.trim();
-  const words=document.querySelector('#lmEditWords').value.split(/[,;\n]/).map(x=>x.trim()).filter(Boolean);
+  const name=document.querySelector('#lmEditName')?.value.trim()||'';
+  const cat=document.querySelector('#lmEditCat')?.value||'psych';
+  const description=document.querySelector('#lmEditDesc')?.value.trim()||'';
+  const words=(document.querySelector('#lmEditWords')?.value||'').split(/[,;\n]/).map(x=>x.trim()).filter(Boolean);
   if(!name){toast('Введите название');return;}
   saveLibraryRecord({id:editorId,name,cat,description,words});
-  closeEditor();render();toast('Запись сохранена');
- };
+  const id=editorId;closeEditor();toast('Запись сохранена');
+ });
  document.querySelector('#lmEditorDiagnosis')?.addEventListener('click',()=>{
   if(!editorId)return;
-  const id=editorId;const active=document.querySelector('#lmEditorDiagnosis')?.dataset.active==='1';closeEditor();setDiagnosisManual(id,!active);
+  const id=editorId, active=diagnosisFor(getState()).includes(id);
+  setDiagnosisManual(id,!active);
  });
- document.querySelector('#lmEditorDelete').onclick=()=>{
+ document.querySelector('#lmEditorDelete')?.addEventListener('click',()=>{
   if(!editorId)return;
-  const id=editorId;deleteLibraryRecord(id);closeEditor();render();toast(isBuiltin(id)?'Встроенная запись скрыта':'Запись удалена');
- };
- document.querySelector('#lmEditorRestore').onclick=()=>{
+  const id=editorId, builtin=isBuiltin(id);
+  deleteLibraryRecord(id);closeEditor();toast(builtin?'Встроенная запись скрыта':'Запись удалена');
+ });
+ document.querySelector('#lmEditorRestore')?.addEventListener('click',()=>{
   if(!editorId)return;
-  restoreBuiltin(editorId);closeEditor();render();toast('Исходная запись восстановлена');
- };
+  const id=editorId;restoreBuiltin(id);closeEditor();toast('Исходная запись восстановлена');
+ });
 }
 
-function render(){const b=document.querySelector('#lmBody');if(!b)return;const s=getState(),u=ui();b.innerHTML=page(u.tab,s);bind();}
+function render(){
+ const b=document.querySelector('#lmBody');if(!b)return;
+ const s=getState(),u=ui();
+ if(editorId){
+  const k=allKinks().find(x=>x.id===editorId)||getLibraryState().custom.find(x=>x.id===editorId);
+  if(!k){editorId=null;} else {b.innerHTML=editorPage(k,s);bindEditor();return;}
+ }
+ b.innerHTML=page(u.tab,s);bind();
+}
 
 function bind(){
- // Events are delegated from the stable overlay, so rerendering #lmBody never kills buttons.
- if(window.__loveMedPanelEventsBound)return;
- const overlay=document.querySelector('#lmOverlay');
- if(!overlay)return;
- window.__loveMedPanelEventsBound=true;
- overlay.addEventListener('click',async e=>{
-  const tab=e.target.closest('[data-tab]');
-  if(tab){const u=ui();u.tab=tab.dataset.tab;saveUI(u);render();return;}
-  const edit=e.target.closest('[data-edit-kink]');
-  if(edit){openEditor(edit.dataset.editKink);return;}
-  const remDiag=e.target.closest('[data-remove-diagnosis]');
-  if(remDiag){removeDiagnosisOnly(remDiag.dataset.removeDiagnosis);return;}
-  const del=e.target.closest('[data-del-kink]');
-  if(del){deleteLibraryRecord(del.dataset.delKink);render();toast('Запись удалена');return;}
-  const restore=e.target.closest('[data-restore-kink]');
-  if(restore){restoreBuiltin(restore.dataset.restoreKink);render();toast('Исходная запись восстановлена');return;}
-  const anam=e.target.closest('#lmAnamnesis,#lmAnamnesis2');
-  if(anam){anamnesis();return;}
-  const add=e.target.closest('#lmAddKink');
-  if(add){
-   const n=document.querySelector('#lmKinkName')?.value.trim()||'',d=document.querySelector('#lmKinkDesc')?.value.trim()||'',cat=document.querySelector('#lmKinkCat')?.value||'psych';
-   const words=(document.querySelector('#lmKinkWords')?.value||'').split(/[,;\n]/).map(x=>x.trim()).filter(Boolean);
-   if(!n){toast('Введите название');return;}
-   addCustom(n,cat,d,words.length?words:[n.toLowerCase()]);render();toast('Запись добавлена');return;
-  }
-  const contact=e.target.closest('[data-del-contact]');
-  if(contact){const st=getState();st.contacts=st.contacts.filter(x=>x.id!==contact.dataset.delContact);await saveState(st);render();return;}
-  if(e.target.closest('#lmParse')){toast(parseLatest()?'Пакет принят ✓':'Пакет не найден');return;}
+ document.querySelectorAll('.lm-tabs [data-tab]').forEach(b=>b.onclick=()=>{const u=ui();u.tab=b.dataset.tab;saveUI(u);render();});
+ document.querySelectorAll('[data-rel]').forEach(x=>x.oninput=async e=>{const st=getState();st.relation[e.target.dataset.rel]=Number(e.target.value);await saveState(st);render();});
+ document.querySelector('#lmAnamnesis')?.addEventListener('click',anamnesis);
+ document.querySelector('#lmAnamnesis2')?.addEventListener('click',anamnesis);
+ [['#lmIntensity','reactionIntensity'],['#lmChance','reactionChance'],['#lmCooldown','reactionCooldown']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('input',async e=>{const st=getState();st[k]=Number(e.target.value);await saveState(st);}));
+ document.querySelector('#lmAddKink')?.addEventListener('click',()=>{
+  const n=document.querySelector('#lmKinkName')?.value.trim()||'',d=document.querySelector('#lmKinkDesc')?.value.trim()||'',cat=document.querySelector('#lmKinkCat')?.value||'psych';
+  const words=(document.querySelector('#lmKinkWords')?.value||'').split(/[,;\n]/).map(x=>x.trim()).filter(Boolean);
+  if(!n){toast('Введите название');return;} addCustom(n,cat,d,words.length?words:[n.toLowerCase()]);render();toast('Запись добавлена');
  });
- overlay.addEventListener('input',async e=>{
-  if(e.target.matches('[data-rel]')){const st=getState();st.relation[e.target.dataset.rel]=Number(e.target.value);await saveState(st);render();return;}
-  const sliders={'#lmIntensity':'reactionIntensity','#lmChance':'reactionChance','#lmCooldown':'reactionCooldown'};
-  const key=Object.entries(sliders).find(([q])=>e.target.matches(q))?.[1];
-  if(key){const st=getState();st[key]=Number(e.target.value);await saveState(st);return;}
- });
- overlay.addEventListener('change',async e=>{
-  const toggles={'#lmEnabled':'enabled','#lmAutoTrack':'autoTrack','#lmAutoReaction':'autoReaction'};
-  const key=Object.entries(toggles).find(([q])=>e.target.matches(q))?.[1];
-  if(key){const st=getState();st[key]=e.target.checked;await saveState(st);return;}
-  if(e.target.matches('#lmFab')){const u=ui();u.showFab=e.target.checked;saveUI(u);syncFab();return;}
- });
+ document.querySelectorAll('[data-edit-kink]').forEach(b=>b.onclick=()=>openEditor(b.dataset.editKink));
+ document.querySelectorAll('[data-del-kink]').forEach(b=>b.onclick=()=>{deleteLibraryRecord(b.dataset.delKink);render();toast('Запись удалена');});
+ document.querySelectorAll('[data-restore-kink]').forEach(b=>b.onclick=()=>{restoreBuiltin(b.dataset.restoreKink);render();toast('Исходная запись восстановлена');});
+ document.querySelectorAll('[data-remove-diagnosis]').forEach(b=>b.onclick=()=>removeDiagnosisOnly(b.dataset.removeDiagnosis));
+ document.querySelectorAll('[data-add-diagnosis]').forEach(b=>b.onclick=()=>setDiagnosisManual(b.dataset.addDiagnosis,true));
+ document.querySelectorAll('[data-del-contact]').forEach(b=>b.onclick=async()=>{const st=getState();st.contacts=st.contacts.filter(x=>x.id!==b.dataset.delContact);await saveState(st);render();});
+ [['#lmEnabled','enabled'],['#lmAutoTrack','autoTrack'],['#lmAutoReaction','autoReaction']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('change',async e=>{const st=getState();st[k]=e.target.checked;await saveState(st);}));
+ document.querySelector('#lmParse')?.addEventListener('click',()=>toast(parseLatest()?'Пакет принят ✓':'Пакет не найден'));
+ document.querySelector('#lmFab')?.addEventListener('change',e=>{const u=ui();u.showFab=e.target.checked;saveUI(u);syncFab();});
 }
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
  document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.2.1</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['react','🧪 Реактивность'],['diag','🔬 Анамнез'],['contacts','👤 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
- document.querySelector('#lmClose').onclick=()=>document.querySelector('#lmOverlay').classList.add('hidden');
- bind();
- ensureEditor();
+ document.querySelector('#lmClose').onclick=()=>{editorId=null;document.querySelector('#lmOverlay').classList.add('hidden');};
 }
 function open(){ensurePanel();document.querySelector('#lmOverlay').classList.remove('hidden');render();}
 function placeFab(){const b=document.querySelector('#lmFabButton');if(!b)return;const u=ui(),p=8,w=b.offsetWidth||42,h=b.offsetHeight||42;b.style.left=Math.max(p,Math.min(innerWidth-w-p,u.x??innerWidth-w-p))+'px';b.style.top=Math.max(p,Math.min(innerHeight-h-p,u.y??120))+'px';b.style.right='auto';b.style.bottom='auto';}
