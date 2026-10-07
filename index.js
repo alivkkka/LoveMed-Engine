@@ -247,14 +247,17 @@ function anamnesis(){
  anamnesisRunning=true;
  try{
   const s=getState(),f=scan();
+  // Every manual re-scan is a clean baseline reset: previous manual add/remove
+  // decisions are intentionally discarded, while the library itself is untouched.
+  s.diagnosisManual={added:[],removed:[]};
   s.anamnesis=f;
-  syncDiagnosis(s);
+  s.diagnosis=[...f];
   s.anamnesisAt=Date.now();
-  s.history.unshift({ts:Date.now(),text:`Анамнез обновлён: обнаружено ${f.length} совпадений.`});
+  s.history.unshift({ts:Date.now(),text:`Базовый анамнез обновлён: обнаружено ${f.length} совпадений.`});
   s.history=s.history.slice(0,40);
   saveState(s);
   render();
-  toast(f.length?`Анализ завершён: найдено ${f.length}`:'Анализ завершён: совпадений не найдено');
+  toast(f.length?`Анализ завершён: базовый диагноз обновлён (${f.length})`:'Анализ завершён: базовый диагноз очищен');
  }catch(err){
   console.error('[LoveMed] Card scan failed:',err);
   toast('Не удалось просканировать карточку. Проверьте консоль SillyTavern.');
@@ -301,7 +304,7 @@ function refreshPrompt(o={}){try{setExtensionPrompt('lovemed_context',prompt(o),
 function toast(t){const e=document.createElement('div');e.className='lm-toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2200);}
 function ui(){try{const u=Object.assign({showFab:true,x:null,y:120,tab:'card'},JSON.parse(localStorage.getItem(UI_KEY)||'{}'));if(u.tab==='diag')u.tab='user';return u;}catch{return{showFab:true,x:null,y:120,tab:'card'};}}
 function saveUI(x){try{localStorage.setItem(UI_KEY,JSON.stringify(x));}catch{}}
-const userCardDefaults=()=>({name:'',age:'',sex:'',gender:'',secondarySex:'',avatar:'',cycleHistory:'',ovulation:'',menstruation:'',pregnancy:'',children:'',notes:'',updatedAt:0});
+const userCardDefaults=()=>({name:'',age:'',sex:'',gender:'',secondarySex:'',avatar:'',cycleHistory:'',ovulation:'',menstruation:'',pregnancy:'',children:'',notes:'',pregnancyChance:25,pregnancyCheckAt:0,pregnancyResult:'',updatedAt:0});
 function userCardKey(){return `lovemed_user_card:${chatKey()}`;}
 function getUserCard(){try{return Object.assign(userCardDefaults(),JSON.parse(localStorage.getItem(userCardKey())||'{}'));}catch{return userCardDefaults();}}
 function saveUserCard(data){const x=Object.assign(userCardDefaults(),data||{},{updatedAt:Date.now()});try{localStorage.setItem(userCardKey(),JSON.stringify(x));}catch{}return x;}
@@ -352,6 +355,44 @@ function userCardTags(u){
  if(u.children)tags.push('Дети');
  return tags;
 }
+function roleplayText(){
+ const c=ctx();if(!c?.chat)return'';
+ return c.chat.map(m=>typeof m?.mes==='string'?m.mes:'').filter(Boolean).join('\n');
+}
+function pregnancyRiskFromRP(text,u){
+ const t=String(text||'').toLowerCase();
+ const explicitRisk=/(без\s+(?:презерватива|защиты)|беззащитн|незащищ|внутр[ьи]\s+(?:не)?|семяизвержен[^.\n]{0,80}(?:внутр|туда|в неё|в нее)|зачат|оплодотвор|беремен)/i.test(t);
+ if(!explicitRisk)return {risk:false,confirmed:/(зачат|оплодотвор|беремен)/i.test(t),chance:0,reason:'Признаков риска не найдено'};
+ let chance=Number(u.pregnancyChance);if(!Number.isFinite(chance))chance=25;
+ if(/овуляц|овулятор/i.test(t)||/овуляц|овулятор/i.test(String(u.ovulation||'')))chance+=20;
+ if(/менструац|месячн/i.test(t)||/менструац|месячн/i.test(String(u.menstruation||'')))chance-=10;
+ if(/контрац|презерватив|защищ[её]н|таблетк[аи]|спирал/i.test(t))chance-=20;
+ chance=Math.max(0,Math.min(90,chance));
+ return {risk:true,confirmed:/(зачат|оплодотвор|беремен)/i.test(t),chance,reason:`Риск обнаружен; расчётный шанс ${chance}%`};
+}
+function randomChildSex(){return Math.random()<0.5?'девочка':'мальчик';}
+function checkUserRP(){
+ const u=getUserCard(),rp=roleplayText();
+ if(!rp){toast('В текущем чате пока нет РП для проверки');return;}
+ const r=pregnancyRiskFromRP(rp,u);
+ if(!r.risk){u.pregnancyCheckAt=Date.now();u.pregnancyResult='Риск беременности в РП не обнаружен.';saveUserCard(u);render();toast('Проверка РП: признаков риска не найдено');return;}
+ let pregnant=false;
+ if(r.confirmed) pregnant=true;
+ else pregnant=Math.random()*100<r.chance;
+ u.pregnancyCheckAt=Date.now();
+ if(pregnant){
+  const childSex=randomChildSex();
+  u.pregnancy='Беременность: подтверждена по результату проверки РП.';
+  u.children=u.children||`Будущий ребёнок: ${childSex}`;
+  u.pregnancyResult=`Беременность определена. Пол ребёнка пока вероятностный: ${childSex}.`;
+  u.notes=u.notes||'Состояние обновлено по проверке текущего РП.';
+  saveUserCard(u);render();toast('Проверка РП: беременность определена');
+ }else{
+  u.pregnancy='Беременность не подтверждена.';
+  u.pregnancyResult=`Риск был обнаружен, но случайный результат не подтвердил беременность (${r.chance}%).`;
+  saveUserCard(u);render();toast(`Проверка РП: беременность не наступила (${r.chance}%)`);
+ }
+}
 function userCardPage(){
  const u=refreshUserCardFromPersona(),av=userAvatarUrl(u.avatar),tags=userCardTags(u);
  const childInfo=u.children||'—';
@@ -359,7 +400,7 @@ function userCardPage(){
    <div class="lm-idcard-spark lm-spark-1">✦</div><div class="lm-idcard-spark lm-spark-2">✧</div>
    ${idCardHeader('user','PERSONAL MEDICAL ID · {{user}}')}
    <div class="lm-idcard-main">
-    <div class="lm-idcard-photo">${av?`<img src="${esc(av)}" alt="">`:'<span>♡</span>'}</div>
+    <button type="button" class="lm-idcard-photo lm-user-avatar-picker" data-user-avatar-picker title="Нажмите, чтобы выбрать аватар">${av?`<img src="${esc(av)}" alt="">`:'<span>♡<small>нажмите для аватара</small></span>'}</button><input id="lmUserAvatarFile" type="file" accept="image/*" hidden>
     <div class="lm-idcard-fields">
       ${idField('ИМЯ',u.name||'{{user}}')}
       ${idField('ВОЗРАСТ',u.age)}
@@ -372,25 +413,25 @@ function userCardPage(){
    </div>
    <div class="lm-idcard-tags">${tags.map(t=>`<span><i>♥</i>${esc(t)}</span>`).join('')||'<span><i>♥</i>Наблюдение не заполнено</span>'}</div>
    <div class="lm-idcard-quote">${esc(u.notes||'Состояние пользователя: данные наблюдения пока не заполнены.')}</div>
-   <div class="lm-idcard-actions"><button id="lmSaveUserCard" type="button" class="lm-primary">Сохранить данные</button><button id="lmRefreshUserCard" type="button" class="lm-secondary">Обновить из персоны</button></div>
+   <div class="lm-idcard-actions"><button id="lmCheckUserRP" type="button" class="lm-primary">🩺 Проверить состояние по РП</button><button id="lmSaveUserCard" type="button" class="lm-secondary">Сохранить данные</button><button id="lmRefreshUserCard" type="button" class="lm-secondary">Обновить из персоны</button></div>
    <details class="lm-idcard-edit"><summary>Редактировать данные карты</summary>
     <div class="lm-user-grid">
      <label>Имя<input id="lmUserName" value="${esc(u.name)}" placeholder="Имя"></label><label>Возраст<input id="lmUserAge" value="${esc(u.age)}" placeholder="Не указан"></label>
      <label>Пол<input id="lmUserSex" value="${esc(u.sex)}" placeholder="Не указан"></label><label>Гендер<input id="lmUserGender" value="${esc(u.gender)}" placeholder="Не указан"></label>
-     <label>Вторичный пол<input id="lmUserSecondary" value="${esc(u.secondarySex)}" placeholder="Не указан"></label><label>Аватар<input id="lmUserAvatar" value="${esc(u.avatar)}" placeholder="Автоматически из персоны"></label>
+     <label>Вторичный пол<input id="lmUserSecondary" value="${esc(u.secondarySex)}" placeholder="Не указан"></label><label>Шанс беременности<input id="lmUserPregChance" type="number" min="0" max="90" value="${esc(u.pregnancyChance)}" placeholder="25"></label><label>Аватар<input id="lmUserAvatar" value="${esc(u.avatar)}" placeholder="Автоматически из персоны"></label>
     </div>
     <div class="lm-history-grid">
      <label>Цикл<textarea id="lmUserCycle" placeholder="Циклы, даты, длительность...">${esc(u.cycleHistory)}</textarea></label><label>Овуляция<textarea id="lmUserOvulation" placeholder="Даты или заметки...">${esc(u.ovulation)}</textarea></label>
      <label>Менструация<textarea id="lmUserMenstruation" placeholder="Даты, длительность...">${esc(u.menstruation)}</textarea></label><label>Беременность<textarea id="lmUserPregnancy" placeholder="История беременностей...">${esc(u.pregnancy)}</textarea></label>
-     <label>Дети<textarea id="lmUserChildren" placeholder="Имя, пол, возраст...">${esc(u.children)}</textarea></label><label>Состояние / заметки<textarea id="lmUserNotes" placeholder="Описание состояния...">${esc(u.notes)}</textarea></label>
+     <label>Дети<textarea id="lmUserChildren" placeholder="Имя, пол, возраст...">${esc(u.children)}</textarea></label><label>Результат проверки РП<textarea id="lmUserPregResult" placeholder="Результат последней проверки...">${esc(u.pregnancyResult)}</textarea></label><label>Состояние / заметки<textarea id="lmUserNotes" placeholder="Описание состояния...">${esc(u.notes)}</textarea></label>
     </div>
     <button id="lmSaveUserHistory" type="button" class="lm-primary">Сохранить историю</button>
    </details>
   </div>`;
 }
-function collectUserIdentity(){return {name:document.querySelector('#lmUserName')?.value.trim()||'',age:document.querySelector('#lmUserAge')?.value.trim()||'',sex:document.querySelector('#lmUserSex')?.value.trim()||'',gender:document.querySelector('#lmUserGender')?.value.trim()||'',secondarySex:document.querySelector('#lmUserSecondary')?.value.trim()||'',avatar:document.querySelector('#lmUserAvatar')?.value.trim()||''};}
+function collectUserIdentity(){let pc=Number(document.querySelector('#lmUserPregChance')?.value);if(!Number.isFinite(pc))pc=25;return {name:document.querySelector('#lmUserName')?.value.trim()||'',age:document.querySelector('#lmUserAge')?.value.trim()||'',sex:document.querySelector('#lmUserSex')?.value.trim()||'',gender:document.querySelector('#lmUserGender')?.value.trim()||'',secondarySex:document.querySelector('#lmUserSecondary')?.value.trim()||'',avatar:document.querySelector('#lmUserAvatar')?.value.trim()||'',pregnancyChance:Math.max(0,Math.min(90,pc))};}
 function saveUserIdentity(){saveUserCard(Object.assign(getUserCard(),collectUserIdentity()));render();toast('Данные пользователя сохранены');}
-function saveUserHistory(){saveUserCard(Object.assign(getUserCard(),{cycleHistory:document.querySelector('#lmUserCycle')?.value.trim()||'',ovulation:document.querySelector('#lmUserOvulation')?.value.trim()||'',menstruation:document.querySelector('#lmUserMenstruation')?.value.trim()||'',pregnancy:document.querySelector('#lmUserPregnancy')?.value.trim()||'',children:document.querySelector('#lmUserChildren')?.value.trim()||'',notes:document.querySelector('#lmUserNotes')?.value.trim()||''}));render();toast('История пользователя сохранена');}
+function saveUserHistory(){saveUserCard(Object.assign(getUserCard(),{cycleHistory:document.querySelector('#lmUserCycle')?.value.trim()||'',ovulation:document.querySelector('#lmUserOvulation')?.value.trim()||'',menstruation:document.querySelector('#lmUserMenstruation')?.value.trim()||'',pregnancy:document.querySelector('#lmUserPregnancy')?.value.trim()||'',children:document.querySelector('#lmUserChildren')?.value.trim()||'',pregnancyResult:document.querySelector('#lmUserPregResult')?.value.trim()||'',notes:document.querySelector('#lmUserNotes')?.value.trim()||''}));render();toast('История пользователя сохранена');}
 function bindUserCard(){
  document.querySelector('#lmSaveUserCard')?.addEventListener('click',saveUserIdentity);
  document.querySelector('#lmRefreshUserCard')?.addEventListener('click',()=>{refreshUserCardFromPersona();render();toast('Данные обновлены из персоны');});
@@ -509,6 +550,7 @@ function render(){
 
 function bind(){
  document.querySelectorAll('.lm-tabs [data-tab]').forEach(b=>b.onclick=()=>{const u=ui();u.tab=b.dataset.tab;saveUI(u);render();});
+ const avatarFile=document.querySelector('#lmUserAvatarFile'); avatarFile?.addEventListener('change',()=>{const file=avatarFile.files?.[0];if(!file)return;if(!file.type.startsWith('image/')){toast('Нужен файл изображения');return;}if(file.size>3*1024*1024){toast('Изображение слишком большое (максимум 3 МБ)');return;}const reader=new FileReader();reader.onload=()=>{saveUserCard(Object.assign(getUserCard(),{avatar:String(reader.result)}));render();toast('Аватар сохранён');};reader.readAsDataURL(file);});
  document.querySelectorAll('[data-rel]').forEach(x=>x.oninput=async e=>{const st=getState();st.relation[e.target.dataset.rel]=Number(e.target.value);await saveState(st);render();});
  [['#lmIntensity','reactionIntensity'],['#lmChance','reactionChance'],['#lmCooldown','reactionCooldown']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('input',async e=>{const st=getState();st[k]=Number(e.target.value);await saveState(st);}));
  document.querySelector('#lmAddKink')?.addEventListener('click',()=>{
@@ -535,7 +577,7 @@ function ensurePanel(){
  if(overlay&&!overlay.dataset.lovemedDelegated){
   overlay.dataset.lovemedDelegated='1';
   overlay.addEventListener('click',e=>{
-   const btn=e.target.closest?.('#lmAnamnesis, #lmAnamnesis2, #lmSaveUserCard, #lmRefreshUserCard, #lmSaveUserHistory');
+   const btn=e.target.closest?.('#lmAnamnesis, #lmAnamnesis2, #lmSaveUserCard, #lmRefreshUserCard, #lmSaveUserHistory, #lmCheckUserRP, [data-user-avatar-picker]');
    if(!btn)return;
    e.preventDefault();
    e.stopPropagation();
@@ -543,6 +585,8 @@ function ensurePanel(){
    if(btn.id==='lmSaveUserCard'){saveUserIdentity();return;}
    if(btn.id==='lmRefreshUserCard'){refreshUserCardFromPersona();render();toast('Данные обновлены из персоны');return;}
    if(btn.id==='lmSaveUserHistory'){saveUserHistory();return;}
+   if(btn.id==='lmCheckUserRP'){checkUserRP();return;}
+   if(btn.matches?.('[data-user-avatar-picker]')){document.querySelector('#lmUserAvatarFile')?.click();return;}
   });
  }
 }
