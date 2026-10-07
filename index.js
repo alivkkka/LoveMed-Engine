@@ -339,21 +339,53 @@ function userAvatarUrl(value){
  if(/^data:/i.test(v)||/^https?:\/\//i.test(v)||v.startsWith('/'))return v;
  return `/User Avatars/${encodeURIComponent(v)}`;
 }
+function idCardHeader(kind,label){
+ return `<div class="lm-idcard-title"><span class="lm-heart lm-heart-left">♥</span><div><div class="lm-idcard-kicker">${label}</div><div class="lm-idcard-name">ID карта</div></div><span class="lm-heart lm-heart-right">♥</span></div>`;
+}
+function idField(label,value){return `<div class="lm-id-field"><span>${label}</span><b>${esc(value||'—')}</b></div>`;}
+function userCardTags(u){
+ const tags=[];
+ if(u.cycleHistory)tags.push('Цикл');
+ if(u.ovulation)tags.push('Овуляция');
+ if(u.menstruation)tags.push('Менструация');
+ if(u.pregnancy)tags.push('Беременность');
+ if(u.children)tags.push('Дети');
+ return tags;
+}
 function userCardPage(){
- const u=refreshUserCardFromPersona(),av=userAvatarUrl(u.avatar);
- return `<div class="lm-card lm-user-card">
-   <div class="lm-id-head"><div class="lm-label">PERSONAL MEDICAL ID · {{user}}</div><span class="lm-id-chip">USER</span></div>
-   <div class="lm-user-id"><div class="lm-user-avatar">${av?`<img src="${esc(av)}">`:'👤'}</div><div class="lm-user-main"><div class="lm-label">ПАЦИЕНТ</div><h3>${esc(u.name||'{{user}}')}</h3><p>Карта пользователя этого чата</p></div></div>
-   <section class="lm-section lm-compact-section"><div class="lm-section-title">ОСНОВНЫЕ ДАННЫЕ</div><div class="lm-user-grid">
-    <label>Имя<input id="lmUserName" value="${esc(u.name)}" placeholder="Имя"></label><label>Возраст<input id="lmUserAge" value="${esc(u.age)}" placeholder="Не указан"></label>
-    <label>Пол<input id="lmUserSex" value="${esc(u.sex)}" placeholder="Не указан"></label><label>Гендер<input id="lmUserGender" value="${esc(u.gender)}" placeholder="Не указан"></label>
-    <label>Вторичный пол<input id="lmUserSecondary" value="${esc(u.secondarySex)}" placeholder="Не указан"></label><label>Аватар<input id="lmUserAvatar" value="${esc(u.avatar)}" placeholder="Автоматически из персоны"></label>
-   </div><div class="lm-button-row"><button id="lmSaveUserCard" type="button" class="lm-primary lm-small-button">Сохранить</button><button id="lmRefreshUserCard" type="button" class="lm-secondary lm-small-button">Обновить из персоны</button></div></section>
-   <section class="lm-section lm-compact-section"><div class="lm-section-title">ИСТОРИЯ</div><div class="lm-user-history lm-history-grid">
-    <label>Менструальный цикл<textarea id="lmUserCycle" placeholder="Циклы, даты, длительность...">${esc(u.cycleHistory)}</textarea></label><label>Овуляция<textarea id="lmUserOvulation" placeholder="Даты или заметки...">${esc(u.ovulation)}</textarea></label>
-    <label>Менструация<textarea id="lmUserMenstruation" placeholder="Даты, длительность...">${esc(u.menstruation)}</textarea></label><label>Беременность<textarea id="lmUserPregnancy" placeholder="История беременностей...">${esc(u.pregnancy)}</textarea></label>
-    <label>Дети<textarea id="lmUserChildren" placeholder="Имя, пол, возраст...">${esc(u.children)}</textarea></label><label>Заметки<textarea id="lmUserNotes" placeholder="Дополнительные сведения...">${esc(u.notes)}</textarea></label>
-   </div><button id="lmSaveUserHistory" type="button" class="lm-primary lm-small-button">Сохранить историю</button></section>
+ const u=refreshUserCardFromPersona(),av=userAvatarUrl(u.avatar),tags=userCardTags(u);
+ const childInfo=u.children||'—';
+ return `<div class="lm-idcard lm-user-idcard">
+   <div class="lm-idcard-spark lm-spark-1">✦</div><div class="lm-idcard-spark lm-spark-2">✧</div>
+   ${idCardHeader('user','PERSONAL MEDICAL ID · {{user}}')}
+   <div class="lm-idcard-main">
+    <div class="lm-idcard-photo">${av?`<img src="${esc(av)}" alt="">`:'<span>♡</span>'}</div>
+    <div class="lm-idcard-fields">
+      ${idField('ИМЯ',u.name||'{{user}}')}
+      ${idField('ВОЗРАСТ',u.age)}
+      ${idField('ПОЛ',u.sex)}
+      ${idField('ГЕНДЕР',u.gender)}
+      ${idField('ВТОРИЧНЫЙ ПОЛ',u.secondarySex)}
+      ${idField('БЕРЕМЕННОСТЬ',u.pregnancy||'—')}
+      ${idField('ПОЛ / ДАННЫЕ РЕБЁНКА',childInfo)}
+    </div>
+   </div>
+   <div class="lm-idcard-tags">${tags.map(t=>`<span><i>♥</i>${esc(t)}</span>`).join('')||'<span><i>♥</i>Наблюдение не заполнено</span>'}</div>
+   <div class="lm-idcard-quote">${esc(u.notes||'Состояние пользователя: данные наблюдения пока не заполнены.')}</div>
+   <div class="lm-idcard-actions"><button id="lmSaveUserCard" type="button" class="lm-primary">Сохранить данные</button><button id="lmRefreshUserCard" type="button" class="lm-secondary">Обновить из персоны</button></div>
+   <details class="lm-idcard-edit"><summary>Редактировать данные карты</summary>
+    <div class="lm-user-grid">
+     <label>Имя<input id="lmUserName" value="${esc(u.name)}" placeholder="Имя"></label><label>Возраст<input id="lmUserAge" value="${esc(u.age)}" placeholder="Не указан"></label>
+     <label>Пол<input id="lmUserSex" value="${esc(u.sex)}" placeholder="Не указан"></label><label>Гендер<input id="lmUserGender" value="${esc(u.gender)}" placeholder="Не указан"></label>
+     <label>Вторичный пол<input id="lmUserSecondary" value="${esc(u.secondarySex)}" placeholder="Не указан"></label><label>Аватар<input id="lmUserAvatar" value="${esc(u.avatar)}" placeholder="Автоматически из персоны"></label>
+    </div>
+    <div class="lm-history-grid">
+     <label>Цикл<textarea id="lmUserCycle" placeholder="Циклы, даты, длительность...">${esc(u.cycleHistory)}</textarea></label><label>Овуляция<textarea id="lmUserOvulation" placeholder="Даты или заметки...">${esc(u.ovulation)}</textarea></label>
+     <label>Менструация<textarea id="lmUserMenstruation" placeholder="Даты, длительность...">${esc(u.menstruation)}</textarea></label><label>Беременность<textarea id="lmUserPregnancy" placeholder="История беременностей...">${esc(u.pregnancy)}</textarea></label>
+     <label>Дети<textarea id="lmUserChildren" placeholder="Имя, пол, возраст...">${esc(u.children)}</textarea></label><label>Состояние / заметки<textarea id="lmUserNotes" placeholder="Описание состояния...">${esc(u.notes)}</textarea></label>
+    </div>
+    <button id="lmSaveUserHistory" type="button" class="lm-primary">Сохранить историю</button>
+   </details>
   </div>`;
 }
 function collectUserIdentity(){return {name:document.querySelector('#lmUserName')?.value.trim()||'',age:document.querySelector('#lmUserAge')?.value.trim()||'',sex:document.querySelector('#lmUserSex')?.value.trim()||'',gender:document.querySelector('#lmUserGender')?.value.trim()||'',secondarySex:document.querySelector('#lmUserSecondary')?.value.trim()||'',avatar:document.querySelector('#lmUserAvatar')?.value.trim()||''};}
@@ -381,18 +413,30 @@ function libraryPage(s){
 function page(tab,s){
  if(tab==='user')return userCardPage();
  if(tab==='card'){
-  const diagnosis=diagnosisFor(s),cp=charProfile(),field=(label,value)=>`<div class="lm-info-tile"><span>${label}</span><b>${esc(value||'Не указано')}</b></div>`;
-  return `<div class="lm-card lm-char-card">
-   <div class="lm-id-head"><div class="lm-label">PATIENT MEDICAL RECORD · {{char}}</div><span class="lm-id-chip">CHAR</span></div>
-   <div class="lm-user-id lm-char-id"><div class="lm-avatar">${cp.avatar?`<img src="${esc(cp.avatar)}">`:'🩺'}</div><div class="lm-user-main"><div class="lm-label">ПАЦИЕНТ</div><h3>${esc(cp.name)}</h3><p>Карточка текущего персонажа</p></div></div>
-   <section class="lm-section lm-compact-section"><div class="lm-section-title">ОСНОВНЫЕ ДАННЫЕ</div><div class="lm-info-grid">${field('Возраст',cp.age)}${field('Пол',cp.sex)}${field('Гендер',cp.gender)}${field('Вторичный пол',cp.secondarySex)}</div></section>
-   <section class="lm-section lm-compact-section"><div class="lm-section-title">МЕДИЦИНСКИЕ ПОКАЗАТЕЛИ</div><div class="lm-rel">${visible(s).map(k=>`<label><span>${REL_LABEL[k]}</span><b>${Math.round(s.relation[k])}</b><input data-rel="${k}" type="range" min="0" max="200" value="${clamp(s.relation[k])}"></label>`).join('')}</div></section>
-   <section class="lm-diagnosis lm-compact-diagnosis"><div class="lm-section-title">ДИАГНОЗ</div><div class="lm-tags">${diagnosis.length?diagnosis.map(k=>`<span class="lm-tag">${esc(kink(k).name)}<button type="button" data-remove-diagnosis="${esc(k)}" title="Убрать из диагноза">×</button></span>`).join(''):'<i>Пока не установлен.</i>'}</div></section>
+  const diagnosis=diagnosisFor(s),cp=charProfile(),tags=diagnosis.map(k=>kink(k).name);
+  return `<div class="lm-idcard lm-char-idcard">
+   <div class="lm-idcard-spark lm-spark-1">✦</div><div class="lm-idcard-spark lm-spark-2">✧</div>
+   ${idCardHeader('char','PATIENT MEDICAL ID · {{char}}')}
+   <div class="lm-idcard-main">
+    <div class="lm-idcard-photo">${cp.avatar?`<img src="${esc(cp.avatar)}" alt="">`:'<span>♡</span>'}</div>
+    <div class="lm-idcard-fields">
+      ${idField('ИМЯ',cp.name)}
+      ${idField('ВОЗРАСТ',cp.age)}
+      ${idField('ПОЛ',cp.sex)}
+      ${idField('ГЕНДЕР',cp.gender)}
+      ${idField('ВТОРИЧНЫЙ ПОЛ',cp.secondarySex)}
+      ${idField('СОСТОЯНИЕ',s.lastShift||'Наблюдение продолжается')}
+    </div>
+   </div>
+   <div class="lm-idcard-tags">${tags.map(t=>`<span><i>♥</i>${esc(t)}</span>`).join('')||'<span><i>♥</i>Диагноз не установлен</span>'}</div>
+   <div class="lm-idcard-quote">${esc(s.lastShift||'Описание состояния появится после наблюдения и анализа карточки.')}</div>
+   <section class="lm-idcard-metrics"><div class="lm-idcard-mini-title">МЕДИЦИНСКИЕ ПОКАЗАТЕЛИ</div><div class="lm-rel">${visible(s).map(k=>`<label><span>${REL_LABEL[k]}</span><b>${Math.round(s.relation[k])}</b><input data-rel="${k}" type="range" min="0" max="200" value="${clamp(s.relation[k])}"></label>`).join('')}</div></section>
+   <section class="lm-idcard-diagnosis"><div class="lm-idcard-mini-title">ДИАГНОЗ</div><div class="lm-tags">${diagnosis.length?diagnosis.map(k=>`<span class="lm-tag">${esc(kink(k).name)}<button type="button" data-remove-diagnosis="${esc(k)}" title="Убрать из диагноза">×</button></span>`).join(''):'<i>Пока не установлен.</i>'}</div></section>
    <button id="lmAnamnesis" type="button" class="lm-primary lm-anamnesis-button">🩺 Провести анамнез карточки пациента</button>
   </div>`;
-}
+ }
 if(tab==='react')return `<div class="lm-card"><section class="lm-section"><h3>Реактивность пациента</h3><div class="lm-sliders"><label>Интенсивность реакции <b>${s.reactionIntensity}</b><input id="lmIntensity" type="range" min="0" max="100" value="${s.reactionIntensity}"></label><label>Вероятность спонтанной реакции <b>${s.reactionChance}%</b><input id="lmChance" type="range" min="0" max="100" value="${s.reactionChance}"></label><label>Период наблюдения <b>${s.reactionCooldown}</b><input id="lmCooldown" type="range" min="1" max="12" value="${s.reactionCooldown}"></label></div></section>${libraryPage(s)}</div>`;
- if(tab==='contacts')return `<div class="lm-card"><section class="lm-section"><h3>Сопутствующие лица</h3><p class="lm-note">Персонажи, влияющие на состояние пациента и отношения.</p>${s.contacts.map(n=>`<article class="lm-contact"><div><b>${esc(n.name)}</b><small>${esc(n.relation||'')}</small><p>${esc(n.notes||'')}</p></div><button data-del-contact="${esc(n.id)}">Удалить</button></article>`).join('')||'<i>Пока нет наблюдаемых контактов.</i>'}</section></div>`;
+ if(tab==='contacts')return `<div class="lm-card lm-contacts-page"><section class="lm-section"><h3>Сопутствующие лица</h3><p class="lm-note">Персонажи, влияющие на состояние пациента и отношения.</p>${s.contacts.map(n=>`<article class="lm-npc-idcard"><div class="lm-npc-corner">✦ ♡</div><div class="lm-npc-photo">♡</div><div class="lm-npc-body"><div class="lm-idcard-kicker">CONTACT MEDICAL ID</div><div class="lm-npc-name">${esc(n.name)}</div><div class="lm-npc-fields">${idField('ОТНОШЕНИЕ',n.relation||'Не определено')}</div><div class="lm-idcard-tags"><span><i>♥</i>Контакт</span>${n.relation?`<span><i>♥</i>${esc(n.relation)}</span>`:''}</div><div class="lm-idcard-quote">${esc(n.notes||'Сопутствующее лицо в текущем наблюдении.')}</div></div><button class="lm-npc-delete" data-del-contact="${esc(n.id)}" title="Удалить">×</button></article>`).join('')||'<i>Пока нет наблюдаемых контактов.</i>'}</section></div>`;
  if(tab==='history')return `<div class="lm-card"><section class="lm-section"><h3>История наблюдений</h3>${s.history.slice(0,20).map(x=>`<article class="lm-history"><time>${new Date(x.ts).toLocaleString()}</time><span>${esc(x.text)}</span></article>`).join('')||'<i>История пока пуста.</i>'}</section></div>`;
  return `<div class="lm-card"><section class="lm-section"><h3>Служебная диагностика</h3><label class="lm-check"><input id="lmEnabled" type="checkbox" ${s.enabled?'checked':''}> Включить LoveMed</label><label class="lm-check"><input id="lmAutoTrack" type="checkbox" ${s.autoTrack?'checked':''}> Автоматически обновлять показатели</label><label class="lm-check"><input id="lmAutoReaction" type="checkbox" ${s.autoReaction?'checked':''}> Разрешить спонтанные реакции</label><p class="lm-note">${esc(s.diagnostics.lastParseStatus)}</p><button id="lmParse" class="lm-secondary">Проверить последний ответ модели</button><label class="lm-check"><input id="lmFab" type="checkbox" ${ui().showFab?'checked':''}> Показывать плавающую кнопку</label></section></div>`;
 }
@@ -485,7 +529,7 @@ function bind(){
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.3.1</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.3.2</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
  document.querySelector('#lmClose').onclick=()=>{editorId=null;document.querySelector('#lmOverlay').classList.add('hidden');};
  const overlay=document.querySelector('#lmOverlay');
  if(overlay&&!overlay.dataset.lovemedDelegated){
