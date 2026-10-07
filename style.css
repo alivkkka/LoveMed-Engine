@@ -282,6 +282,17 @@
 .lm-group-member-card .lm-char-card-edit{margin-top:10px}
 .lm-group-member-card .lm-idcard-main{padding-bottom:11px}
 @media(max-width:600px){.lm-group-member-card .lm-idcard-fields{grid-template-columns:1fr 1fr}.lm-group-member-card .lm-idcard-main{grid-template-columns:82px 1fr}.lm-group-member-card .lm-idcard-photo{width:82px;height:110px}}
-
-/* v0.3.9 multi-character cards */
-.lm-multi-actions{display:flex;justify-content:flex-end;gap:8px;margin:8px 0 0}.lm-multi-actions button{width:auto!important;padding:7px 12px!important;border-radius:12px!important}.lm-multi-member-card .lm-idcard-quote{margin-top:8px}.lm-multi-cards .lm-group-intro h3{letter-spacing:.08em}@media(max-width:600px){.lm-multi-actions{justify-content:stretch}.lm-multi-actions button{width:100%!important}}
+/* v0.4.0 — anamnesis & observation history */
+.lm-anamnesis-summary{margin-top:12px;padding:11px 12px;border:1px solid rgba(69,238,228,.12);border-radius:14px;background:rgba(255,255,255,.025);color:#c9d9d7;font-size:10px;line-height:1.5}
+.lm-history-add{display:grid;gap:8px;margin:12px 0 14px}
+.lm-history-add select,.lm-history-add textarea{width:100%;box-sizing:border-box;border:1px solid rgba(69,238,228,.14);border-radius:12px;background:rgba(255,255,255,.035);color:#eef8f7;padding:9px 10px;outline:none}
+.lm-history-add textarea{min-height:70px;resize:vertical;font:inherit}
+.lm-history-add select:focus,.lm-history-add textarea:focus{border-color:rgba(69,238,228,.35);box-shadow:0 0 14px rgba(69,238,228,.06)}
+.lm-history-list{display:grid;gap:8px}
+.lm-history{position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:4px 9px;padding:10px 34px 10px 11px;border:1px solid rgba(156,255,248,.10);border-radius:13px;background:rgba(255,255,255,.025)}
+.lm-history time{grid-column:1/-1;color:#718986;font-size:8px;letter-spacing:.06em}
+.lm-history b{font-size:9px;color:#69e9e0;text-transform:uppercase;letter-spacing:.08em}
+.lm-history span{font-size:10px;color:#d5e1df;line-height:1.45}
+.lm-history>button{position:absolute;right:8px;top:9px;width:22px;height:22px;border:0;border-radius:50%;background:rgba(255,255,255,.05);color:#9ab0ae;cursor:pointer}
+.lm-history>button:hover{background:rgba(255,255,255,.09);color:#fff}
+#lmClearHistory{margin-top:12px}
