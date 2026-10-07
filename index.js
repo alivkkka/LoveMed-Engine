@@ -332,7 +332,8 @@ function extractUserFields(text){return extractProfileFields(text);}
 function refreshUserCardFromPersona(){
  const current=getUserCard(),text=userPersonaText(),parsed=extractUserFields(text);
  if(!current.name){const c=ctx();current.name=String(c?.name1||c?.userName||document.querySelector('#your_name')?.value||'').trim();}
- for(const [k,v] of Object.entries(parsed))if(!current[k]&&v)current[k]=v;
+ for(const [k,v] of Object.entries(parsed))if(k!=='sex'&&!current[k]&&v)current[k]=v;
+ current.sex='';
  if(!current.avatar){const a=userPersonaAvatar();if(a)current.avatar=a;}
  return saveUserCard(current);
 }
@@ -404,7 +405,6 @@ function userCardPage(){
     <div class="lm-idcard-fields">
       ${idField('ИМЯ',u.name||'{{user}}')}
       ${idField('ВОЗРАСТ',u.age)}
-      ${idField('ПОЛ',u.sex)}
       ${idField('ГЕНДЕР',u.gender)}
       ${idField('ВТОРИЧНЫЙ ПОЛ',u.secondarySex)}
       ${idField('БЕРЕМЕННОСТЬ',u.pregnancy||'—')}
@@ -422,7 +422,7 @@ function userCardPage(){
    <details class="lm-idcard-edit"><summary>Редактировать данные карты</summary>
     <div class="lm-user-grid">
      <label>Имя<input id="lmUserName" value="${esc(u.name)}" placeholder="Имя"></label><label>Возраст<input id="lmUserAge" value="${esc(u.age)}" placeholder="Не указан"></label>
-     <label>Пол<input id="lmUserSex" value="${esc(u.sex)}" placeholder="Не указан"></label><label>Гендер<input id="lmUserGender" value="${esc(u.gender)}" placeholder="Не указан"></label>
+     <label>Гендер<input id="lmUserGender" value="${esc(u.gender)}" placeholder="Не указан"></label>
      <label>Вторичный пол<input id="lmUserSecondary" value="${esc(u.secondarySex)}" placeholder="Не указан"></label><label>Шанс беременности<input id="lmUserPregChance" type="number" min="0" max="90" value="${esc(u.pregnancyChance)}" placeholder="25"></label><label>Аватар<input id="lmUserAvatar" value="${esc(u.avatar)}" placeholder="Автоматически из персоны"></label>
     </div>
     <div class="lm-history-grid">
@@ -433,13 +433,29 @@ function userCardPage(){
    </details>
   </div>`;
 }
-function collectUserIdentity(){let pc=Number(document.querySelector('#lmUserPregChance')?.value);if(!Number.isFinite(pc))pc=25;return {name:document.querySelector('#lmUserName')?.value.trim()||'',age:document.querySelector('#lmUserAge')?.value.trim()||'',sex:document.querySelector('#lmUserSex')?.value.trim()||'',gender:document.querySelector('#lmUserGender')?.value.trim()||'',secondarySex:document.querySelector('#lmUserSecondary')?.value.trim()||'',avatar:document.querySelector('#lmUserAvatar')?.value.trim()||'',pregnancyChance:Math.max(0,Math.min(90,pc))};}
+function collectUserIdentity(){let pc=Number(document.querySelector('#lmUserPregChance')?.value);if(!Number.isFinite(pc))pc=25;return {name:document.querySelector('#lmUserName')?.value.trim()||'',age:document.querySelector('#lmUserAge')?.value.trim()||'',sex:'',gender:document.querySelector('#lmUserGender')?.value.trim()||'',secondarySex:document.querySelector('#lmUserSecondary')?.value.trim()||'',avatar:document.querySelector('#lmUserAvatar')?.value.trim()||getUserCard().avatar||'',pregnancyChance:Math.max(0,Math.min(90,pc))};}
 function saveUserIdentity(){saveUserCard(Object.assign(getUserCard(),collectUserIdentity()));render();toast('Данные пользователя сохранены');}
 function saveUserHistory(){saveUserCard(Object.assign(getUserCard(),{cycleHistory:document.querySelector('#lmUserCycle')?.value.trim()||'',ovulation:document.querySelector('#lmUserOvulation')?.value.trim()||'',menstruation:document.querySelector('#lmUserMenstruation')?.value.trim()||'',pregnancy:document.querySelector('#lmUserPregnancy')?.value.trim()||'',children:document.querySelector('#lmUserChildren')?.value.trim()||'',pregnancyResult:document.querySelector('#lmUserPregResult')?.value.trim()||'',notes:document.querySelector('#lmUserNotes')?.value.trim()||''}));render();toast('История пользователя сохранена');}
 function bindUserCard(){
- document.querySelector('#lmSaveUserCard')?.addEventListener('click',saveUserIdentity);
- document.querySelector('#lmRefreshUserCard')?.addEventListener('click',()=>{refreshUserCardFromPersona();render();toast('Данные обновлены из персоны');});
- document.querySelector('#lmSaveUserHistory')?.addEventListener('click',saveUserHistory);
+ const saveBtn=document.querySelector('#lmSaveUserCard');
+ if(saveBtn)saveBtn.onclick=e=>{e.preventDefault();saveUserIdentity();};
+ const refreshBtn=document.querySelector('#lmRefreshUserCard');
+ if(refreshBtn)refreshBtn.onclick=e=>{e.preventDefault();refreshUserCardFromPersona();render();toast('Данные обновлены из персоны');};
+ const historyBtn=document.querySelector('#lmSaveUserHistory');
+ if(historyBtn)historyBtn.onclick=e=>{e.preventDefault();saveUserHistory();};
+ const avatarPicker=document.querySelector('[data-user-avatar-picker]');
+ const avatarFile=document.querySelector('#lmUserAvatarFile');
+ if(avatarPicker&&avatarFile)avatarPicker.onclick=e=>{e.preventDefault();e.stopPropagation();avatarFile.click();};
+ if(avatarFile)avatarFile.onchange=()=>{
+  const file=avatarFile.files?.[0];
+  if(!file)return;
+  if(!file.type.startsWith('image/')){toast('Нужен файл изображения');avatarFile.value='';return;}
+  if(file.size>5*1024*1024){toast('Изображение слишком большое (максимум 5 МБ)');avatarFile.value='';return;}
+  const reader=new FileReader();
+  reader.onload=()=>{const u=getUserCard();u.avatar=String(reader.result||'');u.sex='';saveUserCard(u);render();toast('Аватар сохранён');};
+  reader.onerror=()=>toast('Не удалось прочитать изображение');
+  reader.readAsDataURL(file);
+ };
 }
 function avatar(){return charProfile().avatar;}
 
@@ -553,8 +569,8 @@ function render(){
 }
 
 function bind(){
+ bindUserCard();
  document.querySelectorAll('.lm-tabs [data-tab]').forEach(b=>b.onclick=()=>{const u=ui();u.tab=b.dataset.tab;saveUI(u);render();});
- const avatarFile=document.querySelector('#lmUserAvatarFile'); avatarFile?.addEventListener('change',()=>{const file=avatarFile.files?.[0];if(!file)return;if(!file.type.startsWith('image/')){toast('Нужен файл изображения');return;}if(file.size>3*1024*1024){toast('Изображение слишком большое (максимум 3 МБ)');return;}const reader=new FileReader();reader.onload=()=>{saveUserCard(Object.assign(getUserCard(),{avatar:String(reader.result)}));render();toast('Аватар сохранён');};reader.readAsDataURL(file);});
  document.querySelectorAll('[data-rel]').forEach(x=>x.oninput=async e=>{const st=getState();st.relation[e.target.dataset.rel]=Number(e.target.value);await saveState(st);render();});
  [['#lmIntensity','reactionIntensity'],['#lmChance','reactionChance'],['#lmCooldown','reactionCooldown']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('input',async e=>{const st=getState();st[k]=Number(e.target.value);await saveState(st);}));
  document.querySelector('#lmAddKink')?.addEventListener('click',()=>{
@@ -581,16 +597,12 @@ function ensurePanel(){
  if(overlay&&!overlay.dataset.lovemedDelegated){
   overlay.dataset.lovemedDelegated='1';
   overlay.addEventListener('click',e=>{
-   const btn=e.target.closest?.('#lmAnamnesis, #lmAnamnesis2, #lmSaveUserCard, #lmRefreshUserCard, #lmSaveUserHistory, #lmCheckUserRP, [data-user-avatar-picker]');
+   const btn=e.target.closest?.('#lmAnamnesis, #lmAnamnesis2, #lmCheckUserRP');
    if(!btn)return;
    e.preventDefault();
    e.stopPropagation();
    if(btn.id==='lmAnamnesis'||btn.id==='lmAnamnesis2'){anamnesis();return;}
-   if(btn.id==='lmSaveUserCard'){saveUserIdentity();return;}
-   if(btn.id==='lmRefreshUserCard'){refreshUserCardFromPersona();render();toast('Данные обновлены из персоны');return;}
-   if(btn.id==='lmSaveUserHistory'){saveUserHistory();return;}
    if(btn.id==='lmCheckUserRP'){checkUserRP();return;}
-   if(btn.matches?.('[data-user-avatar-picker]')){document.querySelector('#lmUserAvatarFile')?.click();return;}
   });
  }
 }
