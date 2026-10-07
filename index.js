@@ -413,6 +413,11 @@ function userCardPage(){
    </div>
    <div class="lm-idcard-tags">${tags.map(t=>`<span><i>♥</i>${esc(t)}</span>`).join('')||'<span><i>♥</i>Наблюдение не заполнено</span>'}</div>
    <div class="lm-idcard-quote">${esc(u.notes||'Состояние пользователя: данные наблюдения пока не заполнены.')}</div>
+   <section class="lm-user-health"><div class="lm-idcard-mini-title">СОСТОЯНИЕ ЦИКЛА</div>
+    <label class="lm-health-row"><span>ЦИКЛ</span><input id="lmUserCycle" value="${esc(u.cycleHistory)}" placeholder="Не указан" aria-label="Цикл"></label>
+    <label class="lm-health-row"><span>ОВУЛЯЦИЯ</span><input id="lmUserOvulation" value="${esc(u.ovulation)}" placeholder="Не указана" aria-label="Овуляция"></label>
+    <label class="lm-health-row"><span>МЕНСТРУАЦИЯ</span><input id="lmUserMenstruation" value="${esc(u.menstruation)}" placeholder="Не указана" aria-label="Менструация"></label>
+   </section>
    <div class="lm-idcard-actions"><button id="lmCheckUserRP" type="button" class="lm-primary">🩺 Проверить состояние по РП</button><button id="lmSaveUserCard" type="button" class="lm-secondary">Сохранить данные</button><button id="lmRefreshUserCard" type="button" class="lm-secondary">Обновить из персоны</button></div>
    <details class="lm-idcard-edit"><summary>Редактировать данные карты</summary>
     <div class="lm-user-grid">
@@ -421,8 +426,7 @@ function userCardPage(){
      <label>Вторичный пол<input id="lmUserSecondary" value="${esc(u.secondarySex)}" placeholder="Не указан"></label><label>Шанс беременности<input id="lmUserPregChance" type="number" min="0" max="90" value="${esc(u.pregnancyChance)}" placeholder="25"></label><label>Аватар<input id="lmUserAvatar" value="${esc(u.avatar)}" placeholder="Автоматически из персоны"></label>
     </div>
     <div class="lm-history-grid">
-     <label>Цикл<textarea id="lmUserCycle" placeholder="Циклы, даты, длительность...">${esc(u.cycleHistory)}</textarea></label><label>Овуляция<textarea id="lmUserOvulation" placeholder="Даты или заметки...">${esc(u.ovulation)}</textarea></label>
-     <label>Менструация<textarea id="lmUserMenstruation" placeholder="Даты, длительность...">${esc(u.menstruation)}</textarea></label><label>Беременность<textarea id="lmUserPregnancy" placeholder="История беременностей...">${esc(u.pregnancy)}</textarea></label>
+     <label>Беременность<textarea id="lmUserPregnancy" placeholder="История беременностей...">${esc(u.pregnancy)}</textarea></label>
      <label>Дети<textarea id="lmUserChildren" placeholder="Имя, пол, возраст...">${esc(u.children)}</textarea></label><label>Результат проверки РП<textarea id="lmUserPregResult" placeholder="Результат последней проверки...">${esc(u.pregnancyResult)}</textarea></label><label>Состояние / заметки<textarea id="lmUserNotes" placeholder="Описание состояния...">${esc(u.notes)}</textarea></label>
     </div>
     <button id="lmSaveUserHistory" type="button" class="lm-primary">Сохранить историю</button>
