@@ -242,3 +242,13 @@
  .lm-npc-photo{width:58px;height:76px;border-radius:14px;font-size:23px}
  .lm-npc-name{font-size:17px}
 }
+
+
+/* v0.3.3 — repeatable baseline scan, RP check and manual user avatar */
+.lm-user-avatar-picker{border:0!important;padding:0!important;cursor:pointer;position:relative}
+.lm-user-avatar-picker:focus-visible{outline:2px solid rgba(243,109,155,.75);outline-offset:3px}
+.lm-user-avatar-picker span{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:100%;height:100%}
+.lm-user-avatar-picker span small{font-family:inherit;font-size:8px;line-height:1.2;letter-spacing:.04em;color:#a9c2c0;font-weight:700;text-transform:uppercase}
+.lm-user-idcard .lm-idcard-actions{justify-content:flex-start}
+.lm-user-idcard .lm-idcard-actions button{border-radius:999px!important}
+.lm-user-idcard .lm-idcard-photo:hover{box-shadow:inset 0 0 24px rgba(69,238,228,.14),0 0 22px rgba(243,109,155,.18)}
