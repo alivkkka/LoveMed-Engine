@@ -273,3 +273,12 @@
 .lm-random-result{min-height:34px;display:flex;align-items:center;padding:7px 11px;border:1px solid rgba(243,109,155,.18);border-radius:999px;background:rgba(141,39,72,.09);color:#a9c2c0;font-size:10px}
 .lm-random-result b{color:#f4d8e1;margin-left:4px}
 @media(max-width:600px){.lm-random-react-row{align-items:stretch}.lm-dice-button{width:100%!important}.lm-random-result{width:100%;box-sizing:border-box}}
+
+/* LoveMed 0.3.8 — group medical cards */
+.lm-group-cards{display:grid;gap:12px}
+.lm-group-intro{margin-bottom:0}
+.lm-group-member-card{margin:0}
+.lm-group-member-card .lm-idcard-tags{margin-bottom:8px}
+.lm-group-member-card .lm-char-card-edit{margin-top:10px}
+.lm-group-member-card .lm-idcard-main{padding-bottom:11px}
+@media(max-width:600px){.lm-group-member-card .lm-idcard-fields{grid-template-columns:1fr 1fr}.lm-group-member-card .lm-idcard-main{grid-template-columns:82px 1fr}.lm-group-member-card .lm-idcard-photo{width:82px;height:110px}}
