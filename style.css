@@ -282,3 +282,6 @@
 .lm-group-member-card .lm-char-card-edit{margin-top:10px}
 .lm-group-member-card .lm-idcard-main{padding-bottom:11px}
 @media(max-width:600px){.lm-group-member-card .lm-idcard-fields{grid-template-columns:1fr 1fr}.lm-group-member-card .lm-idcard-main{grid-template-columns:82px 1fr}.lm-group-member-card .lm-idcard-photo{width:82px;height:110px}}
+
+/* v0.3.9 multi-character cards */
+.lm-multi-actions{display:flex;justify-content:flex-end;gap:8px;margin:8px 0 0}.lm-multi-actions button{width:auto!important;padding:7px 12px!important;border-radius:12px!important}.lm-multi-member-card .lm-idcard-quote{margin-top:8px}.lm-multi-cards .lm-group-intro h3{letter-spacing:.08em}@media(max-width:600px){.lm-multi-actions{justify-content:stretch}.lm-multi-actions button{width:100%!important}}
