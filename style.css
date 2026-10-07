@@ -160,4 +160,85 @@
  .lm-user-main h3{font-size:22px}
  .lm-button-row{gap:7px}
  .lm-primary,.lm-secondary,.lm-danger{min-height:34px;padding:8px 12px}
-          }
+}
+
+/* v0.3.2 — unified romantic medical ID cards */
+.lm-idcard{
+  position:relative;
+  overflow:hidden;
+  padding:17px;
+  border:1px solid rgba(69,238,228,.28);
+  border-radius:26px;
+  background:
+    radial-gradient(circle at 8% 8%,rgba(141,39,72,.16),transparent 28%),
+    radial-gradient(circle at 92% 88%,rgba(69,238,228,.10),transparent 30%),
+    linear-gradient(145deg,rgba(17,39,42,.96),rgba(7,17,19,.98));
+  box-shadow:0 0 0 1px rgba(69,238,228,.05),0 0 28px rgba(69,238,228,.12),0 12px 36px rgba(0,0,0,.28);
+}
+.lm-idcard::before,.lm-idcard::after{
+  content:"♡";
+  position:absolute;
+  color:rgba(244,116,157,.48);
+  font-size:24px;
+  pointer-events:none;
+  z-index:0;
+}
+.lm-idcard::before{left:8px;bottom:7px;transform:rotate(-15deg)}
+.lm-idcard::after{right:8px;top:6px;transform:rotate(15deg)}
+.lm-idcard>*{position:relative;z-index:1}
+.lm-idcard-spark{position:absolute!important;color:rgba(156,255,248,.55);font-size:13px;pointer-events:none;z-index:2!important}
+.lm-spark-1{left:28px;top:58px}.lm-spark-2{right:28px;bottom:54px}
+.lm-idcard-title{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:center;margin-bottom:14px}
+.lm-idcard-kicker{font-size:9px;letter-spacing:.16em;color:var(--lm-teal);font-weight:900;text-transform:uppercase}
+.lm-idcard-name{margin-top:2px;font-family:Georgia,"Times New Roman",cursive;font-size:27px;line-height:1;font-style:italic;font-weight:700;letter-spacing:.02em;color:#f7fbfa;text-shadow:0 0 12px rgba(69,238,228,.16)}
+.lm-heart{font-family:Georgia,serif;font-size:31px;line-height:1;color:#f36d9b;text-shadow:0 0 13px rgba(243,109,155,.35)}
+.lm-idcard-main{display:grid;grid-template-columns:112px 1fr;gap:15px;align-items:start;padding:0 2px 14px;border-bottom:1px solid rgba(69,238,228,.16)}
+.lm-idcard-photo{width:112px;height:145px;border-radius:20px;overflow:hidden;display:grid;place-items:center;background:linear-gradient(145deg,#351624,#123537);border:1px solid rgba(156,255,248,.28);box-shadow:inset 0 0 22px rgba(69,238,228,.08),0 5px 18px rgba(0,0,0,.24);font-size:42px;color:#f36d9b}
+.lm-idcard-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.lm-idcard-fields{display:grid;grid-template-columns:1fr 1fr;gap:2px 13px;min-width:0}
+.lm-id-field{min-width:0;display:grid;grid-template-columns:minmax(74px,max-content) 1fr;gap:7px;align-items:baseline;padding:7px 0;border-bottom:1px dashed rgba(156,255,248,.12)}
+.lm-id-field span{font-size:9px;letter-spacing:.07em;color:#91aaa9;font-weight:800;white-space:nowrap}
+.lm-id-field b{min-width:0;font-size:12px;color:#f1f8f7;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lm-idcard-tags{display:flex;flex-wrap:wrap;gap:6px;margin:11px 0 9px}
+.lm-idcard-tags>span{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:999px;border:1px solid rgba(243,109,155,.26);background:rgba(141,39,72,.13);color:#f5dce5;font-size:10px;line-height:1}
+.lm-idcard-tags i{font-style:normal;color:#f36d9b;font-size:10px}
+.lm-idcard-quote{padding:9px 11px;border-left:2px solid rgba(69,238,228,.46);border-radius:0 13px 13px 0;background:rgba(69,238,228,.055);color:#a9c2c0;font-size:11px;line-height:1.45;font-style:italic}
+.lm-idcard-metrics,.lm-idcard-diagnosis{margin-top:12px;padding-top:11px;border-top:1px solid rgba(69,238,228,.13)}
+.lm-idcard-mini-title{font-size:9px;letter-spacing:.16em;color:var(--lm-teal);font-weight:900;margin-bottom:8px}
+.lm-idcard-metrics .lm-rel{gap:7px}
+.lm-idcard-metrics .lm-rel label{padding:6px 8px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid rgba(69,238,228,.08)}
+.lm-idcard-metrics .lm-rel input{margin-top:2px}
+.lm-idcard-diagnosis .lm-tags{margin-top:0}
+.lm-idcard .lm-anamnesis-button{margin-top:12px;width:100%!important}
+.lm-idcard-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.lm-idcard-actions button{flex:0 1 auto!important;width:auto!important}
+.lm-idcard-edit{margin-top:12px;border-top:1px solid rgba(69,238,228,.12);padding-top:9px}
+.lm-idcard-edit summary{cursor:pointer;color:#9cefeb;font-size:11px;font-weight:800;padding:4px 2px}
+.lm-idcard-edit .lm-user-grid{margin-top:9px}
+.lm-idcard-edit .lm-history-grid{margin-top:9px}
+.lm-idcard-edit>button{margin-top:9px}
+.lm-contacts-page .lm-section{border-bottom:0}
+.lm-npc-idcard{position:relative;display:grid;grid-template-columns:72px 1fr auto;gap:11px;align-items:start;margin-top:10px;padding:12px;border:1px solid rgba(69,238,228,.22);border-radius:21px;background:linear-gradient(145deg,rgba(17,39,42,.84),rgba(7,17,19,.92));box-shadow:0 0 20px rgba(69,238,228,.07)}
+.lm-npc-corner{position:absolute;right:10px;top:7px;color:rgba(243,109,155,.58);font-size:11px;letter-spacing:3px}
+.lm-npc-photo{width:72px;height:92px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(145deg,#351624,#123537);border:1px solid rgba(156,255,248,.23);color:#f36d9b;font-size:28px}
+.lm-npc-body{min-width:0}
+.lm-npc-name{font-family:Georgia,"Times New Roman",serif;font-size:19px;font-weight:700;margin:3px 0 5px;color:#f5fbfa}
+.lm-npc-fields{max-width:100%}
+.lm-npc-fields .lm-id-field{grid-template-columns:max-content 1fr;border-bottom:0;padding:3px 0}
+.lm-npc-fields .lm-id-field b{font-size:11px}
+.lm-npc-idcard .lm-idcard-tags{margin:6px 0}
+.lm-npc-idcard .lm-idcard-quote{font-size:10px;padding:7px 9px}
+.lm-npc-delete{width:30px!important;height:30px!important;min-width:30px!important;padding:0!important;border:1px solid rgba(243,109,155,.25)!important;border-radius:999px!important;background:rgba(141,39,72,.13)!important;color:#f36d9b!important;font-size:17px!important;align-self:start;cursor:pointer}
+@media(max-width:600px){
+ .lm-idcard{padding:14px;border-radius:23px}
+ .lm-idcard-main{grid-template-columns:92px 1fr;gap:11px}
+ .lm-idcard-photo{width:92px;height:124px;border-radius:17px}
+ .lm-idcard-name{font-size:24px}
+ .lm-heart{font-size:27px}
+ .lm-idcard-fields{grid-template-columns:1fr}
+ .lm-id-field{grid-template-columns:minmax(78px,max-content) 1fr;padding:6px 0}
+ .lm-idcard-metrics .lm-rel{grid-template-columns:1fr 1fr}
+ .lm-npc-idcard{grid-template-columns:58px 1fr auto;padding:10px;border-radius:18px}
+ .lm-npc-photo{width:58px;height:76px;border-radius:14px;font-size:23px}
+ .lm-npc-name{font-size:17px}
+}
