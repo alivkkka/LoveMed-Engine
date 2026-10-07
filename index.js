@@ -307,8 +307,34 @@ function addManualHistory(){
  if(!text){toast('Введите текст наблюдения');return;}
  const s=getState();s.history.unshift({ts:Date.now(),type,text});s.history=s.history.slice(0,80);saveState(s);render();toast('Запись добавлена в историю');
 }
+function editHistoryEntry(ts){
+ const s=getState(),item=(s.history||[]).find(x=>String(x.ts)===String(ts));
+ if(!item)return;
+ const text=window.prompt('Изменить запись журнала:',item.text||'');
+ if(text===null)return;
+ const value=text.trim();if(!value){toast('Запись не может быть пустой');return;}
+ item.text=value;saveState(s);render();toast('Запись обновлена');
+}
 function deleteHistoryEntry(ts){const s=getState();s.history=(s.history||[]).filter(x=>String(x.ts)!==String(ts));saveState(s);render();toast('Запись удалена');}
-function clearHistory(){const s=getState();s.history=[];saveState(s);render();toast('История наблюдений очищена');}
+function clearHistory(){const s=getState();s.history=[];saveState(s);historyExpanded=false;render();toast('История наблюдений очищена');}
+function historyDate(ts){
+ const d=new Date(ts),today=new Date();
+ const same=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
+ if(same(d,today))return 'СЕГОДНЯ';
+ const y=new Date(today);y.setDate(today.getDate()-1);if(same(d,y))return 'ВЧЕРА';
+ return d.toLocaleDateString(undefined,{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function historyPage(s){
+ const items=Array.isArray(s.history)?s.history:[];
+ const shown=historyExpanded?items:items.slice(0,10);
+ const groups=[];shown.forEach(x=>{const label=historyDate(x.ts);let g=groups.find(v=>v.label===label);if(!g){g={label,items:[]};groups.push(g)}g.items.push(x)});
+ return `<div class="lm-card lm-history-page"><section class="lm-section lm-journal-section">
+  <div class="lm-journal-head"><div><h3>📜 Журнал наблюдений</h3><div class="lm-journal-count">${items.length} ${items.length===1?'запись':items.length<5?'записи':'записей'} · автоматические события сохраняются здесь</div></div><button id="lmAddHistoryToggle" type="button" class="lm-journal-add">＋</button></div>
+  <div id="lmHistoryComposer" class="lm-history-composer hidden"><div class="lm-history-composer-row"><select id="lmHistoryType"><option>Наблюдение</option><option>Состояние</option><option>Отношения</option><option>Реактив</option><option>Медицинское</option><option>Другое</option></select><textarea id="lmHistoryText" rows="2" placeholder="Короткая запись…"></textarea><button id="lmAddHistory" type="button" class="lm-primary lm-history-save">Сохранить</button></div></div>
+  <div class="lm-journal-toolbar">${items.length>10?`<button id="lmHistoryMore" type="button" class="lm-secondary">${historyExpanded?'Скрыть старые':'Показать ещё'}</button>`:''}${items.length?'<button id="lmClearHistory" type="button" class="lm-secondary lm-history-clear">Очистить</button>':''}</div>
+  <div class="lm-journal-list">${groups.map(g=>`<div class="lm-journal-date">${g.label}</div>${g.items.map(x=>`<article class="lm-journal-entry"><time>${new Date(x.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}</time><div class="lm-journal-type">${esc(x.type||'Наблюдение')}</div><div class="lm-journal-text">${esc(x.text)}</div><div class="lm-journal-actions"><button type="button" data-edit-history="${esc(x.ts)}" title="Изменить">✎</button><button type="button" data-del-history="${esc(x.ts)}" title="Удалить">🗑</button></div></article>`).join('')}`).join('')||'<div class="lm-journal-empty">Журнал пока пуст. Значимые изменения появятся здесь автоматически.</div>'}</div>
+ </section></div>`;
+}
 function visible(s){
  const a=(s.activeFeelings||[]).filter(k=>REL_LABEL[k]);
  const r=REL_FIELDS.map(([k])=>[k,clamp(s.relation[k])]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
@@ -636,7 +662,7 @@ if(tab==='react'){
  return `<div class="lm-card"><section class="lm-section"><h3>Реактивность пациента</h3><div class="lm-sliders"><label>Интенсивность реакции <b>${s.reactionIntensity}</b><input id="lmIntensity" type="range" min="0" max="100" value="${s.reactionIntensity}"></label><label>Вероятность спонтанной реакции <b>${s.reactionChance}%</b><input id="lmChance" type="range" min="0" max="100" value="${s.reactionChance}"></label><label>Период наблюдения <b>${s.reactionCooldown}</b><input id="lmCooldown" type="range" min="1" max="12" value="${s.reactionCooldown}"></label></div></section><section class="lm-section lm-random-react"><h3>🎲 Ситуативный кубик</h3><p class="lm-note">Кубик выбирает до трёх подходящих вариантов из диагноза. В момент генерации модель смотрит на текущую сцену и выбирает из них <b>один</b> самый естественный вариант. Остальные предпочтения не навязываются.</p><div class="lm-random-react-row"><button id="lmRollKink" type="button" class="lm-primary lm-dice-button">🎲 Выбрать варианты</button><div class="lm-random-result">${randomNames.length?`Варианты: <b>${esc(randomNames.join(' · '))}</b>`:'Варианты ещё не выбраны'}</div></div></section>${libraryPage(s)}</div>`;
 }
  if(tab==='contacts')return `<div class="lm-card lm-contacts-page"><section class="lm-section"><h3>Сопутствующие лица</h3><p class="lm-note">Персонажи, влияющие на состояние пациента и отношения.</p>${s.contacts.map(n=>`<article class="lm-npc-idcard"><div class="lm-npc-corner">✦ ♡</div><div class="lm-npc-photo">♡</div><div class="lm-npc-body"><div class="lm-idcard-kicker">CONTACT MEDICAL ID</div><div class="lm-npc-name">${esc(n.name)}</div><div class="lm-npc-fields">${idField('ОТНОШЕНИЕ',n.relation||'Не определено')}</div><div class="lm-idcard-tags"><span><i>♥</i>Контакт</span>${n.relation?`<span><i>♥</i>${esc(n.relation)}</span>`:''}</div><div class="lm-idcard-quote">${esc(n.notes||'Сопутствующее лицо в текущем наблюдении.')}</div></div><button class="lm-npc-delete" data-del-contact="${esc(n.id)}" title="Удалить">×</button></article>`).join('')||'<i>Пока нет наблюдаемых контактов.</i>'}</section></div>`;
- if(tab==='history')return `<div class="lm-card"><section class="lm-section"><h3>📋 История наблюдений</h3><p class="lm-note">Здесь сохраняются значимые автоматические изменения и ваши собственные записи.</p><div class="lm-history-add"><select id="lmHistoryType"><option>Наблюдение</option><option>Состояние</option><option>Отношения</option><option>Реактив</option><option>Медицинское</option><option>Другое</option></select><textarea id="lmHistoryText" placeholder="Добавить собственную запись..."></textarea><button id="lmAddHistory" type="button" class="lm-primary">＋ Добавить запись</button></div><div class="lm-history-list">${s.history.slice(0,40).map(x=>`<article class="lm-history"><time>${new Date(x.ts).toLocaleString()}</time><b>${esc(x.type||'Наблюдение')}</b><span>${esc(x.text)}</span><button type="button" data-del-history="${esc(x.ts)}" title="Удалить">×</button></article>`).join('')||'<i>История пока пуста.</i>'}</div>${s.history.length?'<button id="lmClearHistory" type="button" class="lm-secondary">Очистить историю</button>':''}</section></div>`;
+ if(tab==='history')return historyPage(s);
  return `<div class="lm-card"><section class="lm-section"><h3>Служебная диагностика</h3><label class="lm-check"><input id="lmEnabled" type="checkbox" ${s.enabled?'checked':''}> Включить LoveMed</label><label class="lm-check"><input id="lmAutoTrack" type="checkbox" ${s.autoTrack?'checked':''}> Автоматически обновлять показатели</label><label class="lm-check"><input id="lmAutoReaction" type="checkbox" ${s.autoReaction?'checked':''}> Разрешить спонтанные реакции</label><p class="lm-note">${esc(s.diagnostics.lastParseStatus)}</p><button id="lmParse" class="lm-secondary">Проверить последний ответ модели</button><label class="lm-check"><input id="lmFab" type="checkbox" ${ui().showFab?'checked':''}> Показывать плавающую кнопку</label></section></div>`;
 }
 
@@ -660,6 +686,7 @@ function editorPage(k,s){
 }
 
 let editorId=null;
+let historyExpanded=false;
 function openEditor(id){
  const k=allKinks().find(x=>x.id===id)||getLibraryState().custom.find(x=>x.id===id);
  if(!k)return;
@@ -723,7 +750,10 @@ function bind(){
  document.querySelectorAll('[data-add-diagnosis]').forEach(b=>b.onclick=()=>setDiagnosisManual(b.dataset.addDiagnosis,true));
  document.querySelectorAll('[data-del-contact]').forEach(b=>b.onclick=async()=>{const st=getState();st.contacts=st.contacts.filter(x=>x.id!==b.dataset.delContact);await saveState(st);render();});
  document.querySelector('#lmAddHistory')?.addEventListener('click',addManualHistory);
+ document.querySelector('#lmAddHistoryToggle')?.addEventListener('click',()=>{const x=document.querySelector('#lmHistoryComposer');if(!x)return;x.classList.toggle('hidden');if(!x.classList.contains('hidden'))document.querySelector('#lmHistoryText')?.focus();});
+ document.querySelectorAll('[data-edit-history]').forEach(b=>b.onclick=()=>editHistoryEntry(b.dataset.editHistory));
  document.querySelectorAll('[data-del-history]').forEach(b=>b.onclick=()=>deleteHistoryEntry(b.dataset.delHistory));
+ document.querySelector('#lmHistoryMore')?.addEventListener('click',()=>{historyExpanded=!historyExpanded;render();});
  document.querySelector('#lmClearHistory')?.addEventListener('click',clearHistory);
  [['#lmEnabled','enabled'],['#lmAutoTrack','autoTrack'],['#lmAutoReaction','autoReaction']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('change',async e=>{const st=getState();st[k]=e.target.checked;await saveState(st);}));
  document.querySelector('#lmParse')?.addEventListener('click',()=>toast(parseLatest()?'Пакет принят ✓':'Пакет не найден'));
