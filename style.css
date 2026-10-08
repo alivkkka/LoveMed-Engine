@@ -536,3 +536,19 @@
 .lm-feeling-chips{display:flex;flex-wrap:wrap;gap:5px}
 .lm-feeling-chips span{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;background:rgba(33,156,201,.16);border:1px solid rgba(93,215,244,.32);box-shadow:0 0 8px rgba(74,211,244,.08);font-size:11px;line-height:1.1;color:#e9fbff}
 .lm-feeling-chips i{font-style:normal;color:#9eeeff}
+
+/* v0.4.6 — compact expandable emotion palettes */
+.lm-all-emotions{margin-top:8px;border-top:1px solid rgba(69,238,228,.10);padding-top:6px}
+.lm-all-emotions>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;border:1px solid rgba(93,215,244,.18);background:rgba(33,156,201,.07);color:#9cefeb;font-size:10px;font-weight:800;user-select:none}
+.lm-all-emotions>summary::-webkit-details-marker{display:none}
+.lm-all-emotions>summary::after{content:'⌄';font-size:11px;opacity:.7}
+.lm-all-emotions[open]>summary::after{content:'⌃'}
+.lm-all-emotions-list{display:grid;grid-template-columns:1fr 1fr;gap:5px 8px;margin-top:7px;padding:7px;border-radius:14px;background:rgba(0,0,0,.12);border:1px solid rgba(69,238,228,.07)}
+.lm-all-emotions-list label{display:grid;grid-template-columns:minmax(0,1fr) 27px;gap:3px 6px;align-items:center;padding:5px 7px;border-radius:12px;background:rgba(255,255,255,.018);border:1px solid rgba(69,238,228,.055);font-size:10px;min-width:0}
+.lm-all-emotions-list label span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#dceceb}
+.lm-all-emotions-list label b{color:var(--lm-teal2);text-align:right;font-size:10px}
+.lm-all-emotions-list input{grid-column:1/3;width:100%;margin:0;accent-color:var(--lm-teal);height:14px}
+.lm-user-all-emotions{margin-top:7px}
+.lm-romance-toggle{margin-top:9px!important;padding:8px 9px!important;border:1px solid rgba(243,109,155,.16)!important;border-radius:13px!important;background:rgba(141,39,72,.07)!important}
+.lm-romance-toggle input{accent-color:#f36d9b}
+@media(max-width:600px){.lm-all-emotions-list{grid-template-columns:1fr}.lm-all-emotions-list label{grid-template-columns:minmax(0,1fr) 27px}.lm-all-emotions-list input{grid-column:1/3}}
