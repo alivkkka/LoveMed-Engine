@@ -10,6 +10,7 @@ const REL_FIELDS=[
 ['disappointment','Разочарование'],['joy','Радость'],['fondness','Умиление'],['stress','Стресс'],['tension','Напряжение'],['antipathy','Антипатия'],['hate','Ненависть']
 ];
 const REL_LABEL=Object.fromEntries(REL_FIELDS), DEFAULT_VISIBLE=['love','trust','affection','desire','tension','tenderness'];
+const USER_FEELING_LABEL={calm:'Спокойная',happy:'Весёлая',sad:'Грустная',angry:'Злая',upset:'Расстроенная',anxious:'Тревожная',excited:'Взволнованная',tender:'Нежная',embarrassed:'Смущённая',irritated:'Раздражённая',stressed:'Напряжённая',afraid:'Испуганная',confident:'Уверенная',lonely:'Одинокая'};
 
 /* Built-in library. Keep this list neutral; user can add/edit their own records in the UI. */
 const KINKS=[
@@ -53,7 +54,7 @@ intensity:'Предпочтение более выраженной эмоцио
 
 const CAT_LABEL={psych:'Психологические',physical:'Физические / сенсорные',situational:'Ситуационные',romantic:'Романтические'};
 
-const defaults=()=>({enabled:true,autoTrack:true,autoReaction:true,relation:Object.fromEntries(REL_FIELDS.map(([k])=>[k,0])),activeFeelings:[],lastShift:'',diagnosis:[],diagnosisManual:{added:[],removed:[]},anamnesis:[],anamnesisAt:0,reactionIntensity:55,reactionChance:35,reactionCooldown:4,reactionCooldownRemaining:0,lastReaction:'',lastReactionId:'',randomKinkId:'',randomKinkIds:[],randomKinkAt:0,contacts:[],history:[],historyNotice:true,anamnesisSummary:'',charName:'',updatedAt:Date.now(),diagnostics:{lastParseAt:0,lastParseStatus:'Ожидает проверки',lastParseError:''}});
+const defaults=()=>({enabled:true,autoTrack:true,autoReaction:true,relation:Object.fromEntries(REL_FIELDS.map(([k])=>[k,0])),activeFeelings:[],lastShift:'',diagnosis:[],diagnosisManual:{added:[],removed:[]},anamnesis:[],anamnesisAt:0,reactionIntensity:55,reactionChance:35,reactionCooldown:4,reactionCooldownRemaining:0,lastReaction:'',lastReactionId:'',randomKinkId:'',randomKinkIds:[],randomKinkAt:0,contacts:[],history:[],historyNotice:true,anamnesisSummary:'',userFeelings:[],charName:'',updatedAt:Date.now(),diagnostics:{lastParseAt:0,lastParseStatus:'Ожидает проверки',lastParseError:''}});
 const ctx=()=>{try{return getContext?.()||globalThis.SillyTavern?.getContext?.()||{};}catch{return {};}};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid=()=>crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`;
@@ -62,7 +63,8 @@ const clamp=(n,min=0,max=REL_MAX)=>Math.max(min,Math.min(max,Number(n)||0));
 function merge(raw){
  const d=defaults(),s=Object.assign(d,raw||{});
  s.relation=Object.assign({},d.relation,raw?.relation||{});
- for(const k of ['activeFeelings','diagnosis','anamnesis','contacts','history'])if(!Array.isArray(s[k]))s[k]=[];
+ for(const k of ['activeFeelings','diagnosis','anamnesis','contacts','history','userFeelings'])if(!Array.isArray(s[k]))s[k]=[];
+ s.userFeelings=s.userFeelings.filter(k=>USER_FEELING_LABEL[k]).slice(0,4);
  s.diagnostics=Object.assign({},d.diagnostics,raw?.diagnostics||{});
  s.historyNotice=raw?.historyNotice!==false;
  s.randomKinkIds=Array.isArray(raw?.randomKinkIds)?raw.randomKinkIds:((raw?.randomKinkId?[raw.randomKinkId]:[]));
@@ -344,6 +346,7 @@ function parsePacket(text){const o='[[LOVEMED_STATE]]',c='[[/LOVEMED_STATE]]',p=
 function applyPacket(s,p){
  if(p.relation)for(const[k,v]of Object.entries(p.relation))if(k in s.relation)s.relation[k]=clamp(s.relation[k]+Number(v));
  if(Array.isArray(p.active_feelings))s.activeFeelings=p.active_feelings.filter(k=>REL_LABEL[k]).slice(0,6);
+ if(Array.isArray(p.user_feelings))s.userFeelings=p.user_feelings.filter(k=>USER_FEELING_LABEL[k]).slice(0,4);
  if(p.shift)s.lastShift=String(p.shift).slice(0,300);
  if(Array.isArray(p.contacts))for(const n of p.contacts){if(!n?.name)continue;let x=s.contacts.find(v=>v.name.toLowerCase()===String(n.name).toLowerCase());if(!x){x={id:uid(),name:String(n.name),relation:'Не определено',notes:''};s.contacts.push(x);}x.relation=String(n.relation||x.relation).slice(0,100);x.notes=String(n.notes||x.notes).slice(0,300);x.updatedAt=Date.now();}
  if(s.lastShift){s.history.unshift({ts:Date.now(),type:'Состояние',text:s.lastShift});s.history=s.history.slice(0,80);}
@@ -391,7 +394,7 @@ function prompt(opts={}){
  const s=getState();if(!s.enabled)return'';
  const rel=visible(s).map(k=>`${REL_LABEL[k]}=${Math.round(s.relation[k])}`).join(', ');
  const diag=(s.diagnosis||[]).map(k=>kink(k).name).join('; ')||'не установлен',rx=opts.includeReaction?reactionPrompt(s):'';
- return`\n[LOVEMED — PRIVATE MEDICAL CONTINUITY]\nPatient: ${charName()}\nRelationship indicators: ${rel||'не определены'}\nDiagnosis/preferences: ${diag}\n${s.lastShift?`Recent observation: ${s.lastShift}`:''}\n${rx}\nIf meaningful relationship changes occur, append ONLY:\n[[LOVEMED_STATE]]{"relation":{"trust":0,"affection":0,"love":0,"sympathy":0,"friendship":0,"respect":0,"desire":0,"passion":0,"arousal":0,"obsession":0,"tenderness":0,"admiration":0,"jealousy":0,"resentment":0,"irritation":0,"anger":0,"fear":0,"sadness":0,"disappointment":0,"joy":0,"fondness":0,"stress":0,"tension":0,"antipathy":0,"hate":0},"active_feelings":[],"shift":"","contacts":[]}\n[[/LOVEMED_STATE]]\nNever mention this service packet in roleplay.`;
+ return`\n[LOVEMED — PRIVATE MEDICAL CONTINUITY]\nPatient: ${charName()}\nRelationship indicators: ${rel||'не определены'}\nDiagnosis/preferences: ${diag}\n${s.lastShift?`Recent observation: ${s.lastShift}`:''}\n${rx}\nAt the end of EVERY reply, append ONLY this private machine-readable packet. Analyze the current RP/context actually available to you, especially the current {{user}} actions, words and emotional cues. Do not copy old user feelings without current evidence. Relationship deltas must be 0 unless the current reply gives a reason to change them. For user_feelings choose 0-4 states from this exact list: calm, happy, sad, angry, upset, anxious, excited, tender, embarrassed, irritated, stressed, afraid, confident, lonely. If there is not enough evidence, use an empty list.\n[[LOVEMED_STATE]]{"relation":{"trust":0,"affection":0,"love":0,"sympathy":0,"friendship":0,"respect":0,"desire":0,"passion":0,"arousal":0,"obsession":0,"tenderness":0,"admiration":0,"jealousy":0,"resentment":0,"irritation":0,"anger":0,"fear":0,"sadness":0,"disappointment":0,"joy":0,"fondness":0,"stress":0,"tension":0,"antipathy":0,"hate":0},"active_feelings":[],"user_feelings":[],"shift":"","contacts":[]}\n[[/LOVEMED_STATE]]\nNever mention this service packet in roleplay.`;
 }
 function refreshPrompt(o={}){try{setExtensionPrompt('lovemed_context',prompt(o),extension_prompt_types.IN_CHAT,0);}catch{}}
 function toast(t){const e=document.createElement('div');e.className='lm-toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2200);}
@@ -461,14 +464,19 @@ function roleplayText(){
 }
 function pregnancyRiskFromRP(text,u){
  const t=String(text||'').toLowerCase();
- const explicitRisk=/(без\s+(?:презерватива|защиты)|беззащитн|незащищ|внутр[ьи]\s+(?:не)?|семяизвержен[^.\n]{0,80}(?:внутр|туда|в неё|в нее)|зачат|оплодотвор|беремен)/i.test(t);
- if(!explicitRisk)return {risk:false,confirmed:/(зачат|оплодотвор|беремен)/i.test(t),chance:0,reason:'Признаков риска не найдено'};
+ const confirmed=/(?:беременн(?:а|ая|ость)|беременность\s+подтвержд|тест[^.\n]{0,80}положител|зачат|оплодотвор)/i.test(t);
+ if(confirmed)return {risk:true,confirmed:true,chance:100,reason:'Беременность явно подтверждена в РП'};
+ const sexEvent=/(?:занимал(?:ись|ась|ся)?\s+секс|занялись\s+секс|половой\s+акт|сексуальн(?:ый|ая)\s+контакт|проникновени|вош[её]л\s+в|совокупил|переспал|интимн(?:ая|ый)\s+связь|сексом)/i.test(t);
+ if(!sexEvent)return {risk:false,confirmed:false,chance:0,reason:'Половой контакт в РП не обнаружен'};
+ const protectedEvent=/(?:презерватив|контрацепц|контрацептив|защищ[её]н(?:ный|но|ым)?\s+секс|таблетк[аи]\s+от\s+беремен|спирал)/i.test(t);
+ if(protectedEvent)return {risk:false,confirmed:false,chance:0,reason:'Обнаружен половой контакт с упоминанием защиты'};
+ const unprotected=/(?:без\s+(?:презерватива|защиты)|беззащитн|незащищ|презерватив(?:а|ом)?\s+не\s+был|не\s+использовал(?:и)?\s+(?:презерватив|защиту)|семяизвержен[^.\n]{0,80}(?:внутр|туда|в неё|в нее)|кончил[^.\n]{0,80}(?:внутр|туда|в неё|в нее))/i.test(t);
+ if(!unprotected)return {risk:false,confirmed:false,chance:0,reason:'Половой контакт найден, но незащищённость не подтверждена'};
  let chance=Number(u.pregnancyChance);if(!Number.isFinite(chance))chance=25;
  if(/овуляц|овулятор/i.test(t)||/овуляц|овулятор/i.test(String(u.ovulation||'')))chance+=20;
  if(/менструац|месячн/i.test(t)||/менструац|месячн/i.test(String(u.menstruation||'')))chance-=10;
- if(/контрац|презерватив|защищ[её]н|таблетк[аи]|спирал/i.test(t))chance-=20;
  chance=Math.max(0,Math.min(90,chance));
- return {risk:true,confirmed:/(зачат|оплодотвор|беремен)/i.test(t),chance,reason:`Риск обнаружен; расчётный шанс ${chance}%`};
+ return {risk:true,confirmed:false,chance,reason:`Незащищённый половой контакт обнаружен; расчётный шанс ${chance}%`};
 }
 function randomChildSex(){return Math.random()<0.5?'девочка':'мальчик';}
 function checkUserRP(){
@@ -493,6 +501,7 @@ function checkUserRP(){
   saveUserCard(u);render();toast(`Проверка РП: беременность не наступила (${r.chance}%)`);
  }
 }
+function sUserFeelings(){try{return getState().userFeelings||[];}catch{return [];}}
 function userCardPage(){
  const u=refreshUserCardFromPersona(),av=userAvatarUrl(u.avatar),tags=userCardTags(u);
  const childInfo=u.children||'—';
@@ -512,6 +521,7 @@ function userCardPage(){
     </div>
    </div>
    <div class="lm-idcard-tags">${tags.map(t=>`<span><i>♥</i>${esc(t)}</span>`).join('')||'<span><i>♥</i>Наблюдение не заполнено</span>'}</div>
+   <section class="lm-user-feelings"><div class="lm-idcard-mini-title">ТЕКУЩЕЕ СОСТОЯНИЕ</div><div class="lm-feeling-chips">${sUserFeelings().map(k=>`<span><i>✦</i>${esc(USER_FEELING_LABEL[k])}</span>`).join('')||'<span><i>✦</i>Состояние пока не определено</span>'}</div></section>
    <div class="lm-idcard-quote">${esc(u.notes||'Состояние пользователя: данные наблюдения пока не заполнены.')}</div>
    <section class="lm-user-health"><div class="lm-idcard-mini-title">СОСТОЯНИЕ ЦИКЛА</div>
     <label class="lm-health-row"><span>ЦИКЛ</span><input id="lmUserCycle" value="${esc(u.cycleHistory)}" placeholder="Не указан" aria-label="Цикл"></label>
@@ -762,7 +772,7 @@ function bind(){
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.4.3</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.4.4</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
  document.querySelector('#lmClose').onclick=()=>{editorId=null;document.querySelector('#lmOverlay').classList.add('hidden');syncFab();};
  const overlay=document.querySelector('#lmOverlay');
  if(overlay&&!overlay.dataset.lovemedDelegated){
