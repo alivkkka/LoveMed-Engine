@@ -10,7 +10,9 @@ const REL_FIELDS=[
 ['disappointment','Разочарование'],['joy','Радость'],['fondness','Умиление'],['stress','Стресс'],['tension','Напряжение'],['antipathy','Антипатия'],['hate','Ненависть']
 ];
 const REL_LABEL=Object.fromEntries(REL_FIELDS), DEFAULT_VISIBLE=['love','trust','affection','desire','tension','tenderness'];
-const USER_FEELING_LABEL={calm:'Спокойная',happy:'Весёлая',sad:'Грустная',angry:'Злая',upset:'Расстроенная',anxious:'Тревожная',excited:'Взволнованная',tender:'Нежная',embarrassed:'Смущённая',irritated:'Раздражённая',stressed:'Напряжённая',afraid:'Испуганная',confident:'Уверенная',lonely:'Одинокая'};
+const ROMANTIC_FIELDS=['love','desire','passion','arousal','obsession','jealousy'];
+const USER_FEELING_LABEL={calm:'Спокойная',happy:'Весёлая',sad:'Грустная',angry:'Злая',upset:'Расстроенная',anxious:'Тревожная',excited:'Взволнованная',tender:'Нежная',embarrassed:'Смущённая',irritated:'Раздражённая',stressed:'Напряжённая',afraid:'Испуганная',confident:'Уверенная',lonely:'Одинокая',interested:'Заинтересованная',content:'Удовлетворённая',disappointed:'Разочарованная',jealous:'Ревнивая',inLove:'Влюблённая',affectionate:'Ласковая',playful:'Игривaя',wary:'Настороженная',confused:'Растерянная',tired:'Уставшая',bored:'Скучающая',determined:'Решительная',guilty:'Виноватая',proud:'Гордая',hopeful:'Надеющаяся',curious:'Любопытная'};
+const USER_FEELING_DEFAULTS=Object.fromEntries(Object.keys(USER_FEELING_LABEL).map(k=>[k,0]));
 
 /* Built-in library. Keep this list neutral; user can add/edit their own records in the UI. */
 const KINKS=[
@@ -54,7 +56,7 @@ intensity:'Предпочтение более выраженной эмоцио
 
 const CAT_LABEL={psych:'Психологические',physical:'Физические / сенсорные',situational:'Ситуационные',romantic:'Романтические'};
 
-const defaults=()=>({enabled:true,autoTrack:true,autoReaction:true,relation:Object.fromEntries(REL_FIELDS.map(([k])=>[k,0])),activeFeelings:[],lastShift:'',diagnosis:[],diagnosisManual:{added:[],removed:[]},anamnesis:[],anamnesisAt:0,reactionIntensity:55,reactionChance:35,reactionCooldown:4,reactionCooldownRemaining:0,lastReaction:'',lastReactionId:'',randomKinkId:'',randomKinkIds:[],randomKinkAt:0,contacts:[],history:[],historyNotice:true,anamnesisSummary:'',userFeelings:[],charName:'',updatedAt:Date.now(),diagnostics:{lastParseAt:0,lastParseStatus:'Ожидает проверки',lastParseError:''}});
+const defaults=()=>({enabled:true,autoTrack:true,autoReaction:true,relationshipMode:'romantic',relation:Object.fromEntries(REL_FIELDS.map(([k])=>[k,0])),activeFeelings:[],lastShift:'',diagnosis:[],diagnosisManual:{added:[],removed:[]},anamnesis:[],anamnesisAt:0,reactionIntensity:55,reactionChance:35,reactionCooldown:4,reactionCooldownRemaining:0,lastReaction:'',lastReactionId:'',randomKinkId:'',randomKinkIds:[],randomKinkAt:0,contacts:[],history:[],historyNotice:true,anamnesisSummary:'',userFeelings:[],userEmotionScores:{...USER_FEELING_DEFAULTS},charName:'',updatedAt:Date.now(),diagnostics:{lastParseAt:0,lastParseStatus:'Ожидает проверки',lastParseError:''}});
 const ctx=()=>{try{return getContext?.()||globalThis.SillyTavern?.getContext?.()||{};}catch{return {};}};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid=()=>crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`;
@@ -64,7 +66,11 @@ function merge(raw){
  const d=defaults(),s=Object.assign(d,raw||{});
  s.relation=Object.assign({},d.relation,raw?.relation||{});
  for(const k of ['activeFeelings','diagnosis','anamnesis','contacts','history','userFeelings'])if(!Array.isArray(s[k]))s[k]=[];
- s.userFeelings=s.userFeelings.filter(k=>USER_FEELING_LABEL[k]).slice(0,4);
+ s.userFeelings=s.userFeelings.filter(k=>USER_FEELING_LABEL[k]).slice(0,6);
+ s.userEmotionScores=Object.assign({},USER_FEELING_DEFAULTS,raw?.userEmotionScores||{});
+ for(const k of Object.keys(s.userEmotionScores))s.userEmotionScores[k]=Math.max(0,Math.min(100,Number(s.userEmotionScores[k])||0));
+ if(s.userFeelings.length&&!Object.values(s.userEmotionScores).some(v=>v>0))s.userFeelings.forEach(k=>s.userEmotionScores[k]=70);
+ s.relationshipMode=raw?.relationshipMode==='platonic'?'platonic':'romantic';
  s.diagnostics=Object.assign({},d.diagnostics,raw?.diagnostics||{});
  s.historyNotice=raw?.historyNotice!==false;
  s.randomKinkIds=Array.isArray(raw?.randomKinkIds)?raw.randomKinkIds:((raw?.randomKinkId?[raw.randomKinkId]:[]));
@@ -338,15 +344,25 @@ function historyPage(s){
  </section></div>`;
 }
 function visible(s){
- const a=(s.activeFeelings||[]).filter(k=>REL_LABEL[k]);
- const r=REL_FIELDS.map(([k])=>[k,clamp(s.relation[k])]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
- return[...new Set([...a,...r,...DEFAULT_VISIBLE])].slice(0,6);
+ const allowed=k=>s.relationshipMode!=='platonic'||!ROMANTIC_FIELDS.includes(k);
+ const a=(s.activeFeelings||[]).filter(k=>REL_LABEL[k]&&allowed(k));
+ const r=REL_FIELDS.map(([k])=>[k,clamp(s.relation[k])]).filter(x=>x[1]>0&&allowed(x[0])).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+ const fallback=(s.relationshipMode==='platonic'?['trust','affection','sympathy','friendship','respect','tenderness']:DEFAULT_VISIBLE).filter(allowed);
+ return[...new Set([...a,...r,...fallback])].slice(0,6);
+}
+function userVisibleFeelings(s){
+ const scores=Object.entries(Object.assign({},USER_FEELING_DEFAULTS,s.userEmotionScores||{})).filter(([k])=>USER_FEELING_LABEL[k]);
+ const selected=(s.userFeelings||[]).filter(k=>USER_FEELING_LABEL[k]);
+ const ranked=scores.filter(([,v])=>Number(v)>0).sort((a,b)=>Number(b[1])-Number(a[1])).map(([k])=>k);
+ return[...new Set([...selected,...ranked])].slice(0,6);
 }
 function parsePacket(text){const o='[[LOVEMED_STATE]]',c='[[/LOVEMED_STATE]]',p=text.lastIndexOf(o);if(p<0)return null;const q=text.indexOf(c,p+o.length);if(q<0)return null;try{return{packet:JSON.parse(text.slice(p+o.length,q).trim()),start:p,end:q+c.length};}catch{return null;}}
 function applyPacket(s,p){
- if(p.relation)for(const[k,v]of Object.entries(p.relation))if(k in s.relation)s.relation[k]=clamp(s.relation[k]+Number(v));
- if(Array.isArray(p.active_feelings))s.activeFeelings=p.active_feelings.filter(k=>REL_LABEL[k]).slice(0,6);
- if(Array.isArray(p.user_feelings))s.userFeelings=p.user_feelings.filter(k=>USER_FEELING_LABEL[k]).slice(0,4);
+ if(p.relation)for(const[k,v]of Object.entries(p.relation)){if(!(k in s.relation))continue;if(s.relationshipMode==='platonic'&&ROMANTIC_FIELDS.includes(k))continue;s.relation[k]=clamp(s.relation[k]+Number(v));}
+ if(Array.isArray(p.active_feelings))s.activeFeelings=p.active_feelings.filter(k=>REL_LABEL[k]&&(s.relationshipMode!=='platonic'||!ROMANTIC_FIELDS.includes(k))).slice(0,6);
+ if(p.user_emotion_scores&&typeof p.user_emotion_scores==='object')for(const[k,v]of Object.entries(p.user_emotion_scores))if(k in USER_FEELING_LABEL)s.userEmotionScores[k]=Math.max(0,Math.min(100,Number(v)||0));
+ if(Array.isArray(p.user_feelings))s.userFeelings=p.user_feelings.filter(k=>USER_FEELING_LABEL[k]).slice(0,6);
+ if(!p.user_emotion_scores&&Array.isArray(p.user_feelings)){Object.keys(s.userEmotionScores).forEach(k=>s.userEmotionScores[k]=0);s.userFeelings.forEach(k=>s.userEmotionScores[k]=70);}
  if(p.shift)s.lastShift=String(p.shift).slice(0,300);
  if(Array.isArray(p.contacts))for(const n of p.contacts){if(!n?.name)continue;let x=s.contacts.find(v=>v.name.toLowerCase()===String(n.name).toLowerCase());if(!x){x={id:uid(),name:String(n.name),relation:'Не определено',notes:''};s.contacts.push(x);}x.relation=String(n.relation||x.relation).slice(0,100);x.notes=String(n.notes||x.notes).slice(0,300);x.updatedAt=Date.now();}
  if(s.lastShift){s.history.unshift({ts:Date.now(),type:'Состояние',text:s.lastShift});s.history=s.history.slice(0,80);}
@@ -394,7 +410,10 @@ function prompt(opts={}){
  const s=getState();if(!s.enabled)return'';
  const rel=visible(s).map(k=>`${REL_LABEL[k]}=${Math.round(s.relation[k])}`).join(', ');
  const diag=(s.diagnosis||[]).map(k=>kink(k).name).join('; ')||'не установлен',rx=opts.includeReaction?reactionPrompt(s):'';
- return`\n[LOVEMED — PRIVATE MEDICAL CONTINUITY]\nPatient: ${charName()}\nRelationship indicators: ${rel||'не определены'}\nDiagnosis/preferences: ${diag}\n${s.lastShift?`Recent observation: ${s.lastShift}`:''}\n${rx}\nAt the end of EVERY reply, append ONLY this private machine-readable packet. Analyze the current RP/context actually available to you, especially the current {{user}} actions, words and emotional cues. Do not copy old user feelings without current evidence. Relationship deltas must be 0 unless the current reply gives a reason to change them. For user_feelings choose 0-4 states from this exact list: calm, happy, sad, angry, upset, anxious, excited, tender, embarrassed, irritated, stressed, afraid, confident, lonely. If there is not enough evidence, use an empty list.\n[[LOVEMED_STATE]]{"relation":{"trust":0,"affection":0,"love":0,"sympathy":0,"friendship":0,"respect":0,"desire":0,"passion":0,"arousal":0,"obsession":0,"tenderness":0,"admiration":0,"jealousy":0,"resentment":0,"irritation":0,"anger":0,"fear":0,"sadness":0,"disappointment":0,"joy":0,"fondness":0,"stress":0,"tension":0,"antipathy":0,"hate":0},"active_feelings":[],"user_feelings":[],"shift":"","contacts":[]}\n[[/LOVEMED_STATE]]\nNever mention this service packet in roleplay.`;
+ const relationMode=s.relationshipMode==='platonic'?'ПЛАТОНИЧЕСКАЯ — не развивай автоматически любовь, желание, страсть, возбуждение, одержимость или романтическую ревность.':'РОМАНТИЧЕСКАЯ — романтическая динамика разрешена.';
+ const relKeys=REL_FIELDS.map(([k])=>k).join(', ');
+ const userKeys=Object.keys(USER_FEELING_LABEL).join(', ');
+ return`\n[LOVEMED — PRIVATE MEDICAL CONTINUITY]\nPatient: ${charName()}\nRelationship mode: ${relationMode}\nCurrent salient relationship indicators: ${rel||'не определены'}\nFull relationship vocabulary: ${relKeys}\nDiagnosis/preferences: ${diag}\n${s.lastShift?`Recent observation: ${s.lastShift}`:''}\n${rx}\nAt the end of EVERY reply, append ONLY this private machine-readable packet. Analyze the current RP/context actually available to you, especially the current {{user}} actions, words and emotional cues. Do not copy old user feelings without current evidence. Relationship deltas must be 0 unless the current reply gives a reason to change them. Choose up to 6 current salient relationship keys from the full vocabulary; active_feelings must reflect the CURRENT scene, not permanently repeat the same six. In PLATONIC mode, romantic relationship keys must stay unchanged and must not be selected as salient. For {{user}}, choose up to 6 current emotions from this exact full vocabulary: ${userKeys}. Also return user_emotion_scores as 0-100 intensity for emotions supported by the current scene; set unsupported emotions to 0 rather than guessing. If there is not enough evidence, use empty user_feelings and zero scores.\n[[LOVEMED_STATE]]{"relation":{"trust":0,"affection":0,"love":0,"sympathy":0,"friendship":0,"respect":0,"desire":0,"passion":0,"arousal":0,"obsession":0,"tenderness":0,"admiration":0,"jealousy":0,"resentment":0,"irritation":0,"anger":0,"fear":0,"sadness":0,"disappointment":0,"joy":0,"fondness":0,"stress":0,"tension":0,"antipathy":0,"hate":0},"active_feelings":[],"user_feelings":[],"user_emotion_scores":{},"shift":"","contacts":[]}\n[[/LOVEMED_STATE]]\nNever mention this service packet in roleplay.`;
 }
 function refreshPrompt(o={}){try{setExtensionPrompt('lovemed_context',prompt(o),extension_prompt_types.IN_CHAT,0);}catch{}}
 function toast(t){const e=document.createElement('div');e.className='lm-toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2200);}
@@ -507,7 +526,10 @@ function checkUserRP(){
   saveUserCard(u);render();toast(`Проверка РП: беременность не наступила (${r.chance}%)`);
  }
 }
-function sUserFeelings(){try{return getState().userFeelings||[];}catch{return [];}}
+function sUserFeelings(){try{return userVisibleFeelings(getState());}catch{return [];}}
+function relationList(s){return REL_FIELDS.filter(([k])=>s.relationshipMode!=='platonic'||!ROMANTIC_FIELDS.includes(k));}
+function allRelationPanel(s){return `<details class="lm-all-emotions"><summary>♡ Посмотреть все эмоции</summary><div class="lm-all-emotions-list">${relationList(s).map(([k])=>`<label><span>${REL_LABEL[k]}</span><b>${Math.round(s.relation[k])}</b><input data-rel="${k}" type="range" min="0" max="200" value="${clamp(s.relation[k])}"></label>`).join('')}</div></details>`;}
+function allUserEmotionPanel(s){return `<details class="lm-all-emotions lm-user-all-emotions"><summary>♡ Посмотреть все эмоции</summary><div class="lm-all-emotions-list">${Object.entries(USER_FEELING_LABEL).map(([k,label])=>`<label><span>${esc(label)}</span><b>${Math.round(Number(s.userEmotionScores?.[k])||0)}</b><input data-user-feeling="${k}" type="range" min="0" max="100" value="${Math.max(0,Math.min(100,Number(s.userEmotionScores?.[k])||0))}"></label>`).join('')}</div></details>`;}
 function userCardPage(){
  const u=refreshUserCardFromPersona(),av=userAvatarUrl(u.avatar),tags=userCardTags(u);
  const childInfo=u.children||'—';
@@ -527,7 +549,7 @@ function userCardPage(){
     </div>
    </div>
    <div class="lm-idcard-tags">${tags.map(t=>`<span><i>♥</i>${esc(t)}</span>`).join('')||'<span><i>♥</i>Наблюдение не заполнено</span>'}</div>
-   <section class="lm-user-feelings"><div class="lm-idcard-mini-title">ТЕКУЩЕЕ СОСТОЯНИЕ</div><div class="lm-feeling-chips">${sUserFeelings().map(k=>`<span><i>✦</i>${esc(USER_FEELING_LABEL[k])}</span>`).join('')||'<span><i>✦</i>Состояние пока не определено</span>'}</div></section>
+   <section class="lm-user-feelings"><div class="lm-idcard-mini-title">ТЕКУЩЕЕ СОСТОЯНИЕ</div><div class="lm-feeling-chips">${sUserFeelings().map(k=>`<span><i>✦</i>${esc(USER_FEELING_LABEL[k])}</span>`).join('')||'<span><i>✦</i>Состояние пока не определено</span>'}</div>${allUserEmotionPanel(getState())}</section>
    <div class="lm-idcard-quote">${esc(u.notes||'Состояние пользователя: данные наблюдения пока не заполнены.')}</div>
    <section class="lm-user-health"><div class="lm-idcard-mini-title">СОСТОЯНИЕ ЦИКЛА</div>
     <label class="lm-health-row"><span>ЦИКЛ</span><input id="lmUserCycle" value="${esc(u.cycleHistory)}" placeholder="Не указан" aria-label="Цикл"></label>
@@ -633,13 +655,17 @@ function charCardEditorPage(s,member=null,index=0){
    <label>Пол<input data-char-field="sex" value="${esc(cp.sex)}" placeholder="Не указан"></label><label>Гендер<input data-char-field="gender" value="${esc(cp.gender)}" placeholder="Не указан"></label>
    <label>Вторичный пол<input data-char-field="secondarySex" value="${esc(cp.secondarySex)}" placeholder="Не указан"></label>
   </div>
+  <label class="lm-check lm-romance-toggle"><input data-relationship-mode type="checkbox" ${s.relationshipMode!=='platonic'?'checked':''}> Разрешить романтическую динамику</label>
+  <p class="lm-note">Выключено — отношения остаются платоническими: доверие, дружба, симпатия, уважение и другие не романтические показатели могут меняться, но LoveMed не будет автоматически развивать романтические.</p>
   <div class="lm-idcard-actions"><button data-save-char-card="${esc(key)}" type="button" class="lm-primary">Сохранить данные карты</button><button data-reset-char-card="${esc(key)}" type="button" class="lm-secondary">Сбросить ручные данные</button></div>
  </details>`;
 }
 function saveCharCardFromRoot(root,key=''){
  const member=key?groupMemberByKey(key):null;
  const data={};['name','age','sex','gender','secondarySex'].forEach(k=>data[k]=root?.querySelector?.(`[data-char-field="${k}"]`)?.value.trim()||'');
- saveCharCard(data,member);render();toast(member?`Карта ${charProfile(member).name} сохранена`:'Карта {{char}} сохранена');
+ saveCharCard(data,member);
+ if(!member){const st=getState();st.relationshipMode=root?.querySelector?.('[data-relationship-mode]')?.checked?'romantic':'platonic';saveState(st);}
+ render();toast(member?`Карта ${charProfile(member).name} сохранена`:'Карта {{char}} сохранена');
 }
 function resetCharCard(key=''){
  const member=key?groupMemberByKey(key):null;
@@ -665,7 +691,7 @@ function page(tab,s){
    </div>
    <div class="lm-idcard-tags">${tags.map(t=>`<span><i>♥</i>${esc(t)}</span>`).join('')||'<span><i>♥</i>Диагноз не установлен</span>'}</div>
    <div class="lm-idcard-quote">${esc(s.lastShift||'Описание состояния появится после наблюдения и анализа карточки.')}</div>
-   <section class="lm-idcard-metrics"><div class="lm-idcard-mini-title">МЕДИЦИНСКИЕ ПОКАЗАТЕЛИ</div><div class="lm-rel">${visible(s).map(k=>`<label><span>${REL_LABEL[k]}</span><b>${Math.round(s.relation[k])}</b><input data-rel="${k}" type="range" min="0" max="200" value="${clamp(s.relation[k])}"></label>`).join('')}</div></section>
+   <section class="lm-idcard-metrics"><div class="lm-idcard-mini-title">МЕДИЦИНСКИЕ ПОКАЗАТЕЛИ</div><div class="lm-rel">${visible(s).map(k=>`<label><span>${REL_LABEL[k]}</span><b>${Math.round(s.relation[k])}</b><input data-rel="${k}" type="range" min="0" max="200" value="${clamp(s.relation[k])}"></label>`).join('')}</div>${allRelationPanel(s)}</section>
    <section class="lm-idcard-diagnosis"><div class="lm-idcard-mini-title">ДИАГНОЗ</div><div class="lm-tags">${diagnosis.length?diagnosis.map(k=>`<span class="lm-tag">${esc(kink(k).name)}<button type="button" data-remove-diagnosis="${esc(k)}" title="Убрать из диагноза">×</button></span>`).join(''):'<i>Пока не установлен.</i>'}</div></section>
    <section class="lm-anamnesis-summary"><div class="lm-idcard-mini-title">АНАМНЕЗ</div><div>${esc(s.anamnesisSummary||'Анамнез ещё не обновлялся.')}</div></section>
    <button id="lmAnamnesis" type="button" class="lm-primary lm-anamnesis-button">🩺 Провести анамнез карточки пациента</button>
@@ -753,6 +779,7 @@ function bind(){
  bindUserCard();
  document.querySelectorAll('.lm-tabs [data-tab]').forEach(b=>b.onclick=()=>{const u=ui();u.tab=b.dataset.tab;saveUI(u);render();});
  document.querySelectorAll('[data-rel]').forEach(x=>x.oninput=async e=>{const st=getState();st.relation[e.target.dataset.rel]=Number(e.target.value);await saveState(st);render();});
+ document.querySelectorAll('[data-user-feeling]').forEach(x=>x.oninput=async e=>{const st=getState();st.userEmotionScores[e.target.dataset.userFeeling]=Number(e.target.value);st.userFeelings=userVisibleFeelings(st);await saveState(st);render();});
  [['#lmIntensity','reactionIntensity'],['#lmChance','reactionChance'],['#lmCooldown','reactionCooldown']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('input',async e=>{const st=getState();st[k]=Number(e.target.value);await saveState(st);}));
  document.querySelector('#lmAddKink')?.addEventListener('click',()=>{
   const n=document.querySelector('#lmKinkName')?.value.trim()||'',d=document.querySelector('#lmKinkDesc')?.value.trim()||'',cat=document.querySelector('#lmKinkCat')?.value||'psych';
