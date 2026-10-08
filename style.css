@@ -303,24 +303,264 @@
 .lm-journal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
 .lm-journal-head h3{margin:0;font-size:17px;line-height:1.15}
 .lm-journal-count{margin-top:4px;color:#819694;font-size:9px;line-height:1.25}
-.lm-journal-add{width:28px!important;height:28px!important;min-width:28px;padding:0!important;border-radius:8px!important;border:1px solid rgba(69,238,228,.20)!important;background:rgba(69,238,228,.06)!important;color:#74eee6!important;font-size:17px!important;line-height:1!important;box-shadow:none!important}
+.lm-journal-add{width:34px!important;height:34px!important;min-width:34px;padding:0!important;border-radius:10px!important;border:1px solid rgba(69,238,228,.22)!important;background:rgba(69,238,228,.07)!important;color:#74eee6!important;font-size:21px!important;line-height:1!important;box-shadow:none!important}
 .lm-journal-add:hover{background:rgba(69,238,228,.13)!important}
-.lm-history-composer{margin:6px 0 8px;padding:6px;border:1px solid rgba(69,238,228,.12);border-radius:9px;background:rgba(255,255,255,.025)}
+.lm-history-composer{margin:7px 0 9px;padding:7px;border:1px solid rgba(69,238,228,.12);border-radius:10px;background:rgba(255,255,255,.025)}
 .lm-history-composer.hidden{display:none}
 .lm-history-composer-row{display:grid;grid-template-columns:112px 1fr auto;gap:6px;align-items:stretch}
-.lm-history-composer select,.lm-history-composer textarea{box-sizing:border-box;width:100%;border:1px solid rgba(156,255,248,.10);border-radius:7px;background:rgba(0,0,0,.13);color:#e9f7f5;padding:5px 7px;font:inherit;font-size:10px;outline:none}
-.lm-history-composer textarea{resize:none;min-height:30px}
-.lm-history-save{min-width:60px!important;padding:5px 7px!important;border-radius:7px!important;font-size:9px!important}
-.lm-journal-toolbar{display:flex;justify-content:flex-end;gap:4px;margin:0 0 4px}
-.lm-journal-toolbar button{padding:4px 7px!important;border-radius:7px!important;font-size:8px!important;line-height:1.2!important}
+.lm-history-composer select,.lm-history-composer textarea{box-sizing:border-box;width:100%;border:1px solid rgba(156,255,248,.10);border-radius:8px;background:rgba(0,0,0,.13);color:#e9f7f5;padding:7px 8px;font:inherit;font-size:10px;outline:none}
+.lm-history-composer textarea{resize:none;min-height:34px}
+.lm-history-save{min-width:70px!important;padding:7px 9px!important;border-radius:8px!important;font-size:10px!important}
+.lm-journal-toolbar{display:flex;justify-content:flex-end;gap:6px;margin:0 0 5px}
+.lm-journal-toolbar button{padding:5px 8px!important;border-radius:8px!important;font-size:9px!important}
 .lm-journal-list{display:grid;gap:4px}
-.lm-journal-date{padding:6px 3px 2px;color:#8a9b99;font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.lm-journal-entry{position:relative;display:grid;grid-template-columns:54px 1fr auto;column-gap:6px;row-gap:1px;align-items:start;padding:7px 6px 7px 7px;border:1px solid rgba(255,255,255,.055);border-radius:10px;background:rgba(255,255,255,.025);min-height:31px}
+.lm-journal-date{padding:7px 3px 3px;color:#8a9b99;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.lm-journal-entry{position:relative;display:grid;grid-template-columns:54px 1fr auto;column-gap:7px;row-gap:2px;align-items:start;padding:8px 7px 8px 8px;border:1px solid rgba(255,255,255,.055);border-radius:11px;background:rgba(255,255,255,.025);min-height:34px}
 .lm-journal-entry time{grid-column:1;color:#80918f;font-size:9px;line-height:1.5;font-variant-numeric:tabular-nums;padding-top:1px}
 .lm-journal-type{grid-column:2;color:#67e6de;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lm-journal-text{grid-column:2;color:#d7e2e0;font-size:10px;line-height:1.35;word-break:break-word}
-.lm-journal-actions{grid-column:3;grid-row:1 / span 2;display:flex;gap:2px;align-self:start}
-.lm-journal-actions button{width:20px!important;height:20px!important;min-width:20px!important;padding:0!important;border:1px solid rgba(156,255,248,.07)!important;border-radius:6px!important;background:rgba(255,255,255,.025)!important;color:#91a5a2!important;font-size:10px!important;line-height:1!important;box-shadow:none!important}
+.lm-journal-actions{grid-column:3;grid-row:1 / span 2;display:flex;gap:3px;align-self:start}
+.lm-journal-actions button{width:25px!important;height:25px!important;min-width:25px!important;padding:0!important;border:1px solid rgba(156,255,248,.08)!important;border-radius:7px!important;background:rgba(255,255,255,.025)!important;color:#91a5a2!important;font-size:12px!important;line-height:1!important;box-shadow:none!important}
 .lm-journal-actions button:hover{background:rgba(69,238,228,.08)!important;color:#dffaf7!important}
 .lm-journal-empty{padding:18px 8px;text-align:center;color:#748684;font-size:10px;line-height:1.45}
-@media(max-width:600px){.lm-history-composer-row{grid-template-columns:1fr auto}.lm-history-composer select{grid-column:1}.lm-history-composer textarea{grid-column:1}.lm-history-save{grid-column:2;grid-row:1 / span 2;align-self:stretch}.lm-journal-entry{grid-template-columns:49px 1fr auto}.lm-journal-actions button{width:19px!important;height:19px!important;min-width:19px!important;font-size:9px!important}}
+@media(max-width:600px){.lm-history-composer-row{grid-template-columns:1fr auto}.lm-history-composer select{grid-column:1}.lm-history-composer textarea{grid-column:1}.lm-history-save{grid-column:2;grid-row:1 / span 2;align-self:stretch}.lm-journal-entry{grid-template-columns:49px 1fr auto}.lm-journal-actions button{width:23px!important;height:23px!important;min-width:23px!important}}
+
+
+/* v0.4.2 — Blue Magic / Crimson Accent skin
+   Visual-only skin plus compact controls. Existing data/logic remain unchanged. */
+:root{
+ --lm-bg:#061725;
+ --lm-panel:rgba(9,34,55,.94);
+ --lm-panel2:rgba(13,53,79,.72);
+ --lm-line:rgba(94,225,255,.28);
+ --lm-teal:#61e9ff;
+ --lm-teal2:#c8f8ff;
+ --lm-burg:#b52d5c;
+ --lm-burg2:#701c3e;
+ --lm-gold:#dce8f5;
+ --lm-text:#eefaff;
+ --lm-muted:#91b4c4;
+ --lm-danger:#ff789f;
+}
+
+.lm-overlay{
+ background:rgba(1,8,18,.72)!important;
+ backdrop-filter:blur(12px)!important;
+}
+.lm-panel{
+ position:relative!important;
+ width:min(590px,94vw)!important;
+ max-width:590px!important;
+ height:calc(100dvh - 18px)!important;
+ margin:9px 9px 9px 0!important;
+ border:1px solid rgba(102,225,255,.34)!important;
+ border-radius:30px!important;
+ overflow:hidden!important;
+ background:
+  radial-gradient(circle at 88% 7%,rgba(76,216,255,.14),transparent 25%),
+  radial-gradient(circle at 8% 92%,rgba(181,45,92,.11),transparent 24%),
+  linear-gradient(145deg,rgba(8,39,64,.96),rgba(3,19,34,.97))!important;
+ box-shadow:0 0 38px rgba(49,207,255,.16),-16px 0 60px rgba(0,0,0,.45)!important;
+}
+/* decorative wolf ears */
+.lm-panel::before{
+ content:"";
+ position:absolute;
+ z-index:3;
+ left:24px;
+ top:-12px;
+ width:92px;
+ height:66px;
+ pointer-events:none;
+ background:
+  radial-gradient(ellipse at 29% 72%,rgba(239,244,255,.92) 0 10%,transparent 11%),
+  linear-gradient(145deg,#d63869 0%,#a52150 62%,#741832 100%);
+ clip-path:polygon(0 100%,22% 8%,48% 100%,52% 100%,78% 8%,100% 100%);
+ filter:drop-shadow(0 0 5px rgba(90,226,255,.8));
+ opacity:.98;
+}
+/* decorative paws: four pads + central pad, stylized with gradients */
+.lm-panel::after{
+ content:"";
+ position:absolute;
+ z-index:3;
+ left:17px;
+ bottom:7px;
+ width:100px;
+ height:43px;
+ pointer-events:none;
+ background:
+  radial-gradient(circle at 22% 24%,#cf3d6c 0 8%,transparent 9%),
+  radial-gradient(circle at 40% 12%,#cf3d6c 0 8%,transparent 9%),
+  radial-gradient(circle at 60% 12%,#cf3d6c 0 8%,transparent 9%),
+  radial-gradient(circle at 78% 25%,#cf3d6c 0 8%,transparent 9%),
+  radial-gradient(ellipse at 50% 66%,#9d234c 0 25%,transparent 26%);
+ filter:drop-shadow(0 0 5px rgba(90,226,255,.78));
+}
+.lm-panel > #lmBody{position:relative;z-index:2}
+
+.lm-head{
+ padding:14px 16px 11px!important;
+ background:linear-gradient(110deg,rgba(55,198,235,.10),rgba(181,45,92,.12))!important;
+ border-bottom:1px solid rgba(94,225,255,.18)!important;
+}
+.lm-kicker{color:#78eaff!important;font-size:9px!important;letter-spacing:.16em!important}
+.lm-head h2{font-size:24px!important;margin:3px 0!important;color:#eafaff!important}
+.lm-head p{font-size:11px!important;color:#8fb7c8!important}
+.lm-close{
+ width:31px!important;height:31px!important;border-radius:50%!important;
+ border:1px solid rgba(255,255,255,.18)!important;
+ background:linear-gradient(145deg,#a92555,#731b3b)!important;
+ color:#fff!important;font-size:19px!important;
+ box-shadow:0 0 12px rgba(181,45,92,.22)!important;
+}
+
+.lm-tabs{
+ gap:5px!important;padding:8px 10px!important;
+ background:rgba(3,19,32,.72)!important;
+ border-bottom:1px solid rgba(94,225,255,.14)!important;
+ scrollbar-width:none;
+}
+.lm-tabs button{
+ padding:6px 10px!important;
+ min-height:28px!important;
+ border:1px solid rgba(94,225,255,.13)!important;
+ border-radius:999px!important;
+ background:rgba(74,174,216,.055)!important;
+ color:#91b8c8!important;
+ font-size:10px!important;
+}
+.lm-tabs button:hover,.lm-tabs button.active{
+ color:#f4fdff!important;
+ border-color:rgba(94,225,255,.48)!important;
+ background:linear-gradient(135deg,rgba(64,203,239,.18),rgba(181,45,92,.17))!important;
+ box-shadow:0 0 12px rgba(66,214,255,.10)!important;
+}
+
+#lmBody{padding:11px!important}
+.lm-card{
+ padding:12px!important;
+ border:1px solid rgba(94,225,255,.20)!important;
+ border-radius:22px!important;
+ background:linear-gradient(145deg,rgba(15,62,88,.43),rgba(4,27,45,.46))!important;
+ box-shadow:inset 0 0 20px rgba(81,218,255,.025)!important;
+}
+.lm-section{padding:11px 1px!important;border-bottom:1px solid rgba(94,225,255,.12)!important}
+.lm-section h3{font-size:18px!important;margin:0 0 5px!important;color:#dff8ff!important}
+.lm-note{font-size:10px!important;color:#88aebd!important;margin:0 0 9px!important}
+
+/* All major controls become compact pills/ovals. */
+.lm-overlay button,
+.lm-primary,.lm-secondary,.lm-danger,
+.lm-custom-form button,
+.lm-contact button,
+.lm-deleted-row .lm-small,
+.lm-editor-actions button{
+ border-radius:999px!important;
+}
+.lm-primary,.lm-secondary,.lm-danger{
+ width:auto!important;
+ min-height:28px!important;
+ padding:5px 11px!important;
+ border:1px solid rgba(94,225,255,.25)!important;
+ background:linear-gradient(135deg,rgba(181,45,92,.92),rgba(137,29,67,.92))!important;
+ color:#fff!important;
+ font-size:10px!important;
+ box-shadow:0 0 12px rgba(181,45,92,.12)!important;
+}
+.lm-secondary{background:linear-gradient(135deg,rgba(181,45,92,.72),rgba(105,25,53,.84))!important}
+.lm-danger{background:linear-gradient(135deg,#bd315f,#8d2449)!important}
+.lm-primary:hover,.lm-secondary:hover,.lm-danger:hover{filter:brightness(1.12)!important}
+.lm-anamnesis-button{width:auto!important;margin-top:9px!important}
+
+/* Compact medical cards / fields. */
+.lm-idcard{
+ padding:13px!important;
+ border-radius:24px!important;
+ border-color:rgba(94,225,255,.27)!important;
+ background:
+  radial-gradient(circle at 8% 5%,rgba(77,218,255,.13),transparent 25%),
+  radial-gradient(circle at 92% 92%,rgba(181,45,92,.10),transparent 22%),
+  rgba(7,40,61,.62)!important;
+}
+.lm-idcard-main{gap:11px!important}
+.lm-idcard-photo{border-radius:18px!important;border-color:rgba(94,225,255,.30)!important}
+.lm-idcard-mini-title{color:#6fe8ff!important}
+.lm-idcard-tags span,.lm-tags span{border-radius:999px!important;background:rgba(66,207,238,.08)!important;border-color:rgba(94,225,255,.22)!important}
+.lm-diagnosis{border-radius:18px!important;background:rgba(181,45,92,.10)!important;border-color:rgba(181,45,92,.30)!important}
+.lm-anamnesis-summary{border-radius:17px!important;background:rgba(57,181,219,.055)!important;border-color:rgba(94,225,255,.15)!important}
+.lm-health-row{border-radius:999px!important;background:rgba(74,190,225,.055)!important}
+.lm-fold{border-radius:18px!important;background:rgba(44,135,173,.045)!important}
+.lm-kink-btn{border-radius:999px!important;background:rgba(59,190,224,.07)!important;border-color:rgba(94,225,255,.20)!important;padding:6px 10px!important;min-height:30px!important}
+.lm-kink-btn.found{background:rgba(181,45,92,.14)!important;border-color:rgba(181,45,92,.48)!important}
+.lm-random-react{border-radius:20px!important;background:linear-gradient(145deg,rgba(16,65,91,.48),rgba(6,28,45,.58))!important}
+.lm-dice-button{min-width:0!important}
+.lm-random-result{min-height:28px!important;padding:5px 10px!important;border-radius:999px!important;background:rgba(181,45,92,.10)!important}
+
+/* Compact journal: small rounded capsules instead of large cards. */
+.lm-history-page .lm-journal-section{padding:4px 2px 8px!important}
+.lm-journal-head{gap:7px!important;margin-bottom:6px!important;padding:7px 9px!important;border:1px solid rgba(94,225,255,.20);border-radius:999px;background:linear-gradient(100deg,rgba(58,183,220,.08),rgba(181,45,92,.08))}
+.lm-journal-head h3{font-size:14px!important;color:#e4faff!important}
+.lm-journal-count{font-size:8px!important;color:#82aabb!important}
+.lm-journal-add{width:28px!important;height:28px!important;min-width:28px!important;border-radius:50%!important;background:linear-gradient(145deg,#be315f,#8d2449)!important;border:1px solid rgba(255,255,255,.18)!important;color:#fff!important;font-size:18px!important;box-shadow:0 0 12px rgba(181,45,92,.22)!important}
+.lm-history-composer{margin:6px 0 7px!important;padding:6px!important;border-radius:18px!important;background:rgba(57,181,219,.045)!important;border-color:rgba(94,225,255,.16)!important}
+.lm-history-composer select,.lm-history-composer textarea{border-radius:999px!important;padding:6px 9px!important;background:rgba(2,20,34,.55)!important;font-size:9px!important}
+.lm-history-composer textarea{border-radius:14px!important;min-height:31px!important}
+.lm-history-save{min-width:0!important;padding:5px 10px!important}
+.lm-journal-toolbar{gap:4px!important;margin:0 0 4px!important}
+.lm-journal-toolbar button{padding:4px 8px!important;border-radius:999px!important;font-size:8px!important}
+.lm-journal-list{gap:3px!important}
+.lm-journal-date{padding:5px 5px 2px!important;color:#7bcfe2!important;font-size:8px!important}
+.lm-journal-entry{
+ grid-template-columns:45px 1fr auto!important;
+ column-gap:6px!important;
+ row-gap:1px!important;
+ padding:6px 6px 6px 8px!important;
+ border:1px solid rgba(94,225,255,.12)!important;
+ border-radius:999px!important;
+ background:linear-gradient(90deg,rgba(48,150,190,.055),rgba(181,45,92,.035))!important;
+ min-height:30px!important;
+}
+.lm-journal-entry time{font-size:8px!important;color:#86a6b3!important;padding-top:1px!important}
+.lm-journal-type{font-size:7px!important;color:#70e6fa!important}
+.lm-journal-text{font-size:9px!important;color:#d8edf2!important;line-height:1.3!important}
+.lm-journal-actions{gap:2px!important}
+.lm-journal-actions button{width:19px!important;height:19px!important;min-width:19px!important;border-radius:50%!important;background:rgba(181,45,92,.38)!important;border-color:rgba(255,255,255,.12)!important;color:#f4dbe3!important;font-size:9px!important}
+.lm-journal-actions button:hover{background:rgba(203,48,95,.72)!important}
+.lm-journal-empty{padding:12px 7px!important}
+
+/* Every input/edit surface is rounded, not square. */
+.lm-custom-form input,.lm-custom-form textarea,.lm-custom-form select,
+.lm-editor-body input,.lm-editor-body textarea,.lm-editor-body select,
+.lm-user-grid input,.lm-user-history textarea{border-radius:999px!important;background:rgba(3,25,42,.58)!important;border-color:rgba(94,225,255,.18)!important}
+.lm-custom-form textarea,.lm-editor-body textarea,.lm-user-history textarea{border-radius:15px!important}
+.lm-custom-row,.lm-custom-edit,.lm-deleted-row,.lm-contact,.lm-found,.lm-history{border-radius:18px!important}
+
+/* Floating medical button: round, wine-colored, and hidden while panel is open. */
+.lm-fab{
+ width:44px!important;height:44px!important;
+ border-radius:50%!important;
+ border:2px solid rgba(122,237,255,.58)!important;
+ background:radial-gradient(circle at 35% 28%,#d34670,#9e2550 60%,#711a3b)!important;
+ color:#fff!important;font-size:19px!important;
+ box-shadow:0 0 18px rgba(67,222,255,.32),0 5px 22px rgba(0,0,0,.5)!important;
+}
+
+/* Page titles/section labels get rounded frames instead of bare headings. */
+.lm-section-title,.lm-label,.lm-idcard-mini-title{
+ display:inline-flex!important;align-items:center!important;
+ padding:4px 9px!important;
+ border:1px solid rgba(94,225,255,.18)!important;
+ border-radius:999px!important;
+ background:rgba(62,190,224,.055)!important;
+}
+
+@media(max-width:600px){
+ .lm-panel{width:calc(100vw - 10px)!important;height:calc(100dvh - 10px)!important;margin:5px!important;border-radius:25px!important}
+ #lmBody{padding:8px!important}
+ .lm-head{padding:12px 13px 9px!important}
+ .lm-tabs{padding:7px!important}
+ .lm-tabs button{padding:5px 9px!important;min-height:26px!important}
+ .lm-card{padding:10px!important;border-radius:19px!important}
+ .lm-journal-entry{grid-template-columns:42px 1fr auto!important;border-radius:18px!important}
+ }
