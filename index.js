@@ -11,6 +11,8 @@ const REL_FIELDS=[
 ];
 const REL_LABEL=Object.fromEntries(REL_FIELDS), DEFAULT_VISIBLE=['love','trust','affection','desire','tension','tenderness'];
 const ROMANTIC_FIELDS=['love','desire','passion','arousal','obsession','jealousy'];
+const RELATIONSHIP_MODES={romantic:'Романтические',platonic:'Платонические',neutral:'Нейтральные'};
+const normalizeRelationshipMode=v=>['romantic','platonic','neutral'].includes(v)?v:'romantic';
 const USER_FEELING_LABEL={calm:'Спокойная',happy:'Весёлая',sad:'Грустная',angry:'Злая',upset:'Расстроенная',anxious:'Тревожная',excited:'Взволнованная',tender:'Нежная',embarrassed:'Смущённая',irritated:'Раздражённая',stressed:'Напряжённая',afraid:'Испуганная',confident:'Уверенная',lonely:'Одинокая',interested:'Заинтересованная',content:'Удовлетворённая',disappointed:'Разочарованная',jealous:'Ревнивая',inLove:'Влюблённая',affectionate:'Ласковая',playful:'Игривaя',wary:'Настороженная',confused:'Растерянная',tired:'Уставшая',bored:'Скучающая',determined:'Решительная',guilty:'Виноватая',proud:'Гордая',hopeful:'Надеющаяся',curious:'Любопытная'};
 const USER_FEELING_DEFAULTS=Object.fromEntries(Object.keys(USER_FEELING_LABEL).map(k=>[k,0]));
 
@@ -70,7 +72,7 @@ function merge(raw){
  s.userEmotionScores=Object.assign({},USER_FEELING_DEFAULTS,raw?.userEmotionScores||{});
  for(const k of Object.keys(s.userEmotionScores))s.userEmotionScores[k]=Math.max(0,Math.min(100,Number(s.userEmotionScores[k])||0));
  if(s.userFeelings.length&&!Object.values(s.userEmotionScores).some(v=>v>0))s.userFeelings.forEach(k=>s.userEmotionScores[k]=70);
- s.relationshipMode=raw?.relationshipMode==='platonic'?'platonic':'romantic';
+ s.relationshipMode=normalizeRelationshipMode(raw?.relationshipMode);
  s.diagnostics=Object.assign({},d.diagnostics,raw?.diagnostics||{});
  s.historyNotice=raw?.historyNotice!==false;
  s.randomKinkIds=Array.isArray(raw?.randomKinkIds)?raw.randomKinkIds:((raw?.randomKinkId?[raw.randomKinkId]:[]));
@@ -344,10 +346,10 @@ function historyPage(s){
  </section></div>`;
 }
 function visible(s){
- const allowed=k=>s.relationshipMode!=='platonic'||!ROMANTIC_FIELDS.includes(k);
+ const allowed=k=>s.relationshipMode!=='platonic'&&s.relationshipMode!=='neutral'||!ROMANTIC_FIELDS.includes(k);
  const a=(s.activeFeelings||[]).filter(k=>REL_LABEL[k]&&allowed(k));
  const r=REL_FIELDS.map(([k])=>[k,clamp(s.relation[k])]).filter(x=>x[1]>0&&allowed(x[0])).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
- const fallback=(s.relationshipMode==='platonic'?['trust','affection','sympathy','friendship','respect','tenderness']:DEFAULT_VISIBLE).filter(allowed);
+ const fallback=(s.relationshipMode==='romantic'?DEFAULT_VISIBLE:['trust','affection','sympathy','friendship','respect','tenderness']).filter(allowed);
  return[...new Set([...a,...r,...fallback])].slice(0,6);
 }
 function userVisibleFeelings(s){
@@ -358,8 +360,8 @@ function userVisibleFeelings(s){
 }
 function parsePacket(text){const o='[[LOVEMED_STATE]]',c='[[/LOVEMED_STATE]]',p=text.lastIndexOf(o);if(p<0)return null;const q=text.indexOf(c,p+o.length);if(q<0)return null;try{return{packet:JSON.parse(text.slice(p+o.length,q).trim()),start:p,end:q+c.length};}catch{return null;}}
 function applyPacket(s,p){
- if(p.relation)for(const[k,v]of Object.entries(p.relation)){if(!(k in s.relation))continue;if(s.relationshipMode==='platonic'&&ROMANTIC_FIELDS.includes(k))continue;s.relation[k]=clamp(s.relation[k]+Number(v));}
- if(Array.isArray(p.active_feelings))s.activeFeelings=p.active_feelings.filter(k=>REL_LABEL[k]&&(s.relationshipMode!=='platonic'||!ROMANTIC_FIELDS.includes(k))).slice(0,6);
+ if(p.relation)for(const[k,v]of Object.entries(p.relation)){if(!(k in s.relation))continue;if((s.relationshipMode==='platonic'||s.relationshipMode==='neutral')&&ROMANTIC_FIELDS.includes(k))continue;s.relation[k]=clamp(s.relation[k]+Number(v));}
+ if(Array.isArray(p.active_feelings))s.activeFeelings=p.active_feelings.filter(k=>REL_LABEL[k]&&(s.relationshipMode!=='platonic'&&s.relationshipMode!=='neutral'||!ROMANTIC_FIELDS.includes(k))).slice(0,6);
  if(p.user_emotion_scores&&typeof p.user_emotion_scores==='object')for(const[k,v]of Object.entries(p.user_emotion_scores))if(k in USER_FEELING_LABEL)s.userEmotionScores[k]=Math.max(0,Math.min(100,Number(v)||0));
  if(Array.isArray(p.user_feelings))s.userFeelings=p.user_feelings.filter(k=>USER_FEELING_LABEL[k]).slice(0,6);
  if(!p.user_emotion_scores&&Array.isArray(p.user_feelings)){Object.keys(s.userEmotionScores).forEach(k=>s.userEmotionScores[k]=0);s.userFeelings.forEach(k=>s.userEmotionScores[k]=70);}
@@ -410,10 +412,10 @@ function prompt(opts={}){
  const s=getState();if(!s.enabled)return'';
  const rel=visible(s).map(k=>`${REL_LABEL[k]}=${Math.round(s.relation[k])}`).join(', ');
  const diag=(s.diagnosis||[]).map(k=>kink(k).name).join('; ')||'не установлен',rx=opts.includeReaction?reactionPrompt(s):'';
- const relationMode=s.relationshipMode==='platonic'?'ПЛАТОНИЧЕСКАЯ — не развивай автоматически любовь, желание, страсть, возбуждение, одержимость или романтическую ревность.':'РОМАНТИЧЕСКАЯ — романтическая динамика разрешена.';
+ const relationMode=s.relationshipMode==='romantic'?'РОМАНТИЧЕСКАЯ — романтическая динамика разрешена.':s.relationshipMode==='platonic'?'ПЛАТОНИЧЕСКАЯ — развивай дружбу, доверие, симпатию и близость без автоматического развития романтических показателей.':'НЕЙТРАЛЬНАЯ — не предполагай романтическую или близкую связь; меняй отношения только при явных признаках текущей сцены.';
  const relKeys=REL_FIELDS.map(([k])=>k).join(', ');
  const userKeys=Object.keys(USER_FEELING_LABEL).join(', ');
- return`\n[LOVEMED — PRIVATE MEDICAL CONTINUITY]\nPatient: ${charName()}\nRelationship mode: ${relationMode}\nCurrent salient relationship indicators: ${rel||'не определены'}\nFull relationship vocabulary: ${relKeys}\nDiagnosis/preferences: ${diag}\n${s.lastShift?`Recent observation: ${s.lastShift}`:''}\n${rx}\nAt the end of EVERY reply, append ONLY this private machine-readable packet. Analyze the current RP/context actually available to you, especially the current {{user}} actions, words and emotional cues. Do not copy old user feelings without current evidence. Relationship deltas must be 0 unless the current reply gives a reason to change them. Choose up to 6 current salient relationship keys from the full vocabulary; active_feelings must reflect the CURRENT scene, not permanently repeat the same six. In PLATONIC mode, romantic relationship keys must stay unchanged and must not be selected as salient. For {{user}}, choose up to 6 current emotions from this exact full vocabulary: ${userKeys}. Also return user_emotion_scores as 0-100 intensity for emotions supported by the current scene; set unsupported emotions to 0 rather than guessing. If there is not enough evidence, use empty user_feelings and zero scores.\n[[LOVEMED_STATE]]{"relation":{"trust":0,"affection":0,"love":0,"sympathy":0,"friendship":0,"respect":0,"desire":0,"passion":0,"arousal":0,"obsession":0,"tenderness":0,"admiration":0,"jealousy":0,"resentment":0,"irritation":0,"anger":0,"fear":0,"sadness":0,"disappointment":0,"joy":0,"fondness":0,"stress":0,"tension":0,"antipathy":0,"hate":0},"active_feelings":[],"user_feelings":[],"user_emotion_scores":{},"shift":"","contacts":[]}\n[[/LOVEMED_STATE]]\nNever mention this service packet in roleplay.`;
+ return`\n[LOVEMED — PRIVATE MEDICAL CONTINUITY]\nPatient: ${charName()}\nRelationship mode: ${relationMode}\nCurrent salient relationship indicators: ${rel||'не определены'}\nFull relationship vocabulary: ${relKeys}\nDiagnosis/preferences: ${diag}\n${s.lastShift?`Recent observation: ${s.lastShift}`:''}\n${rx}\nAt the end of EVERY reply, append ONLY this private machine-readable packet. Analyze the current RP/context actually available to you, especially the current {{user}} actions, words and emotional cues. Do not copy old user feelings without current evidence. Relationship deltas must be 0 unless the current reply gives a reason to change them. Choose up to 6 current salient relationship keys from the full vocabulary; active_feelings must reflect the CURRENT scene, not permanently repeat the same six. In PLATONIC or NEUTRAL mode, romantic relationship keys must stay unchanged and must not be selected as salient. In NEUTRAL mode, do not assume an existing bond unless the current scene provides evidence. For {{user}}, choose up to 6 current emotions from this exact full vocabulary: ${userKeys}. Also return user_emotion_scores as 0-100 intensity for emotions supported by the current scene; set unsupported emotions to 0 rather than guessing. If there is not enough evidence, use empty user_feelings and zero scores.\n[[LOVEMED_STATE]]{"relation":{"trust":0,"affection":0,"love":0,"sympathy":0,"friendship":0,"respect":0,"desire":0,"passion":0,"arousal":0,"obsession":0,"tenderness":0,"admiration":0,"jealousy":0,"resentment":0,"irritation":0,"anger":0,"fear":0,"sadness":0,"disappointment":0,"joy":0,"fondness":0,"stress":0,"tension":0,"antipathy":0,"hate":0},"active_feelings":[],"user_feelings":[],"user_emotion_scores":{},"shift":"","contacts":[]}\n[[/LOVEMED_STATE]]\nNever mention this service packet in roleplay.`;
 }
 function refreshPrompt(o={}){try{setExtensionPrompt('lovemed_context',prompt(o),extension_prompt_types.IN_CHAT,0);}catch{}}
 function toast(t){const e=document.createElement('div');e.className='lm-toast';e.textContent=t;document.body.appendChild(e);setTimeout(()=>e.remove(),2200);}
@@ -655,8 +657,12 @@ function charCardEditorPage(s,member=null,index=0){
    <label>Пол<input data-char-field="sex" value="${esc(cp.sex)}" placeholder="Не указан"></label><label>Гендер<input data-char-field="gender" value="${esc(cp.gender)}" placeholder="Не указан"></label>
    <label>Вторичный пол<input data-char-field="secondarySex" value="${esc(cp.secondarySex)}" placeholder="Не указан"></label>
   </div>
-  <label class="lm-check lm-romance-toggle"><input data-relationship-mode type="checkbox" ${s.relationshipMode!=='platonic'?'checked':''}> Разрешить романтическую динамику</label>
-  <p class="lm-note">Выключено — отношения остаются платоническими: доверие, дружба, симпатия, уважение и другие не романтические показатели могут меняться, но LoveMed не будет автоматически развивать романтические.</p>
+  <label class="lm-relationship-mode">Тип связи<select data-relationship-mode>
+   <option value="romantic" ${s.relationshipMode==='romantic'?'selected':''}>💞 Романтические</option>
+   <option value="platonic" ${s.relationshipMode==='platonic'?'selected':''}>🤝 Платонические</option>
+   <option value="neutral" ${s.relationshipMode==='neutral'?'selected':''}>🧩 Нейтральные</option>
+  </select></label>
+  <p class="lm-note">Романтические — LoveMed может развивать любовь и влечение. Платонические — только дружеская/эмоциональная связь без автоматической романтики. Нейтральные — тип связи не задан, поэтому LoveMed не предполагает близость и ждёт явных признаков из РП.</p>
   <div class="lm-idcard-actions"><button data-save-char-card="${esc(key)}" type="button" class="lm-primary">Сохранить данные карты</button><button data-reset-char-card="${esc(key)}" type="button" class="lm-secondary">Сбросить ручные данные</button></div>
  </details>`;
 }
@@ -664,7 +670,7 @@ function saveCharCardFromRoot(root,key=''){
  const member=key?groupMemberByKey(key):null;
  const data={};['name','age','sex','gender','secondarySex'].forEach(k=>data[k]=root?.querySelector?.(`[data-char-field="${k}"]`)?.value.trim()||'');
  saveCharCard(data,member);
- if(!member){const st=getState();st.relationshipMode=root?.querySelector?.('[data-relationship-mode]')?.checked?'romantic':'platonic';saveState(st);}
+ if(!member){const st=getState();st.relationshipMode=normalizeRelationshipMode(root?.querySelector?.('[data-relationship-mode]')?.value);saveState(st);}
  render();toast(member?`Карта ${charProfile(member).name} сохранена`:'Карта {{char}} сохранена');
 }
 function resetCharCard(key=''){
