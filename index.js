@@ -463,18 +463,24 @@ function roleplayText(){
  return c.chat.map(m=>typeof m?.mes==='string'?m.mes:'').filter(Boolean).join('\n');
 }
 function pregnancyRiskFromRP(text,u){
- const t=String(text||'').toLowerCase();
- const confirmed=/(?:беременн(?:а|ая|ость)|беременность\s+подтвержд|тест[^.\n]{0,80}положител|зачат|оплодотвор)/i.test(t);
- if(confirmed)return {risk:true,confirmed:true,chance:100,reason:'Беременность явно подтверждена в РП'};
- const sexEvent=/(?:занимал(?:ись|ась|ся)?\s+секс|занялись\s+секс|половой\s+акт|сексуальн(?:ый|ая)\s+контакт|проникновени|вош[её]л\s+в|совокупил|переспал|интимн(?:ая|ый)\s+связь|сексом)/i.test(t);
- if(!sexEvent)return {risk:false,confirmed:false,chance:0,reason:'Половой контакт в РП не обнаружен'};
- const protectedEvent=/(?:презерватив|контрацепц|контрацептив|защищ[её]н(?:ный|но|ым)?\s+секс|таблетк[аи]\s+от\s+беремен|спирал)/i.test(t);
+ const raw=String(text||'');
+ const normalize=v=>v.toLowerCase().replace(/[«»"“”]/g,' ');
+ const sentences=normalize(raw).split(/[.!?\n]+/).map(x=>x.trim()).filter(Boolean);
+ const negation=/(?:не\s+был(?:о|а|и)?|не\s+было|не\s+происходил|не\s+произош[её]л|не\s+занимал(?:ись|ась|ся)?|не\s+занялись|не\s+было\s+секса|никакого\s+секса|без\s+секса|отказал(?:ась|ся)|остановил(?:ась|ся)|не\s+дошло\s+до)/i;
+ const pregnancyNegative=/(?:не\s+беременна|не\s+беременен|не\s+беременна\b|беременность\s+(?:не\s+подтверждена|исключена|отсутствует)|тест\s+(?:отрицател(?:ен|ьный)|показывает\s+отрицательный)|не\s+зачат|не\s+оплодотвор)/i;
+ const pregnancyPositive=/(?:беременна\b|беременность\s+(?:подтверждена|подтвердил(?:ась|ся)|установлена|обнаружена)|тест\s+(?:положител(?:ен|ьный)|показал\s+две\s+полоски)|зачатие\s+подтверждено|оплодотворение\s+подтверждено)/i;
+ if(pregnancyPositive.test(raw)&&!pregnancyNegative.test(raw))return {risk:true,confirmed:true,chance:100,reason:'Беременность явно подтверждена в РП'};
+ const sexPositive=/(?:занимал(?:ись|ась|ся)?\s+секс|занялись\s+секс|половой\s+акт|сексуальн(?:ый|ая)\s+контакт|проникновени|совокупил(?:ись|ся|ась)?|переспал(?:и|а)?|интимн(?:ая|ый)\s+связь|сексом)/i;
+ const sexSentences=sentences.filter(x=>sexPositive.test(x)&&!negation.test(x));
+ if(!sexSentences.length)return {risk:false,confirmed:false,chance:0,reason:'Половой контакт в РП не обнаружен'};
+ const sexText=sexSentences.join(' ');
+ const protectedEvent=/(?:презерватив|контрацепц|контрацептив|защищ[её]н(?:ный|но|ым)?\s+секс|таблетк[аи]\s+от\s+беремен|спирал)/i.test(sexText);
  if(protectedEvent)return {risk:false,confirmed:false,chance:0,reason:'Обнаружен половой контакт с упоминанием защиты'};
- const unprotected=/(?:без\s+(?:презерватива|защиты)|беззащитн|незащищ|презерватив(?:а|ом)?\s+не\s+был|не\s+использовал(?:и)?\s+(?:презерватив|защиту)|семяизвержен[^.\n]{0,80}(?:внутр|туда|в неё|в нее)|кончил[^.\n]{0,80}(?:внутр|туда|в неё|в нее))/i.test(t);
+ const unprotected=/(?:без\s+(?:презерватива|защиты)|беззащитн|незащищ|презерватив(?:а|ом)?\s+не\s+был|не\s+использовал(?:и)?\s+(?:презерватив|защиту)|семяизвержен[^.\n]{0,80}(?:внутр|туда|в неё|в нее)|кончил[^.\n]{0,80}(?:внутр|туда|в неё|в нее))/i.test(sexText);
  if(!unprotected)return {risk:false,confirmed:false,chance:0,reason:'Половой контакт найден, но незащищённость не подтверждена'};
  let chance=Number(u.pregnancyChance);if(!Number.isFinite(chance))chance=25;
- if(/овуляц|овулятор/i.test(t)||/овуляц|овулятор/i.test(String(u.ovulation||'')))chance+=20;
- if(/менструац|месячн/i.test(t)||/менструац|месячн/i.test(String(u.menstruation||'')))chance-=10;
+ if(/овуляц|овулятор/i.test(sexText)||/овуляц|овулятор/i.test(String(u.ovulation||'')))chance+=20;
+ if(/менструац|месячн/i.test(sexText)||/менструац|месячн/i.test(String(u.menstruation||'')))chance-=10;
  chance=Math.max(0,Math.min(90,chance));
  return {risk:true,confirmed:false,chance,reason:`Незащищённый половой контакт обнаружен; расчётный шанс ${chance}%`};
 }
