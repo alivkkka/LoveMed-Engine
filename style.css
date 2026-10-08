@@ -303,24 +303,24 @@
 .lm-journal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
 .lm-journal-head h3{margin:0;font-size:17px;line-height:1.15}
 .lm-journal-count{margin-top:4px;color:#819694;font-size:9px;line-height:1.25}
-.lm-journal-add{width:34px!important;height:34px!important;min-width:34px;padding:0!important;border-radius:10px!important;border:1px solid rgba(69,238,228,.22)!important;background:rgba(69,238,228,.07)!important;color:#74eee6!important;font-size:21px!important;line-height:1!important;box-shadow:none!important}
+.lm-journal-add{width:28px!important;height:28px!important;min-width:28px;padding:0!important;border-radius:8px!important;border:1px solid rgba(69,238,228,.20)!important;background:rgba(69,238,228,.06)!important;color:#74eee6!important;font-size:17px!important;line-height:1!important;box-shadow:none!important}
 .lm-journal-add:hover{background:rgba(69,238,228,.13)!important}
-.lm-history-composer{margin:7px 0 9px;padding:7px;border:1px solid rgba(69,238,228,.12);border-radius:10px;background:rgba(255,255,255,.025)}
+.lm-history-composer{margin:6px 0 8px;padding:6px;border:1px solid rgba(69,238,228,.12);border-radius:9px;background:rgba(255,255,255,.025)}
 .lm-history-composer.hidden{display:none}
 .lm-history-composer-row{display:grid;grid-template-columns:112px 1fr auto;gap:6px;align-items:stretch}
-.lm-history-composer select,.lm-history-composer textarea{box-sizing:border-box;width:100%;border:1px solid rgba(156,255,248,.10);border-radius:8px;background:rgba(0,0,0,.13);color:#e9f7f5;padding:7px 8px;font:inherit;font-size:10px;outline:none}
-.lm-history-composer textarea{resize:none;min-height:34px}
-.lm-history-save{min-width:70px!important;padding:7px 9px!important;border-radius:8px!important;font-size:10px!important}
-.lm-journal-toolbar{display:flex;justify-content:flex-end;gap:6px;margin:0 0 5px}
-.lm-journal-toolbar button{padding:5px 8px!important;border-radius:8px!important;font-size:9px!important}
+.lm-history-composer select,.lm-history-composer textarea{box-sizing:border-box;width:100%;border:1px solid rgba(156,255,248,.10);border-radius:7px;background:rgba(0,0,0,.13);color:#e9f7f5;padding:5px 7px;font:inherit;font-size:10px;outline:none}
+.lm-history-composer textarea{resize:none;min-height:30px}
+.lm-history-save{min-width:60px!important;padding:5px 7px!important;border-radius:7px!important;font-size:9px!important}
+.lm-journal-toolbar{display:flex;justify-content:flex-end;gap:4px;margin:0 0 4px}
+.lm-journal-toolbar button{padding:4px 7px!important;border-radius:7px!important;font-size:8px!important;line-height:1.2!important}
 .lm-journal-list{display:grid;gap:4px}
-.lm-journal-date{padding:7px 3px 3px;color:#8a9b99;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.lm-journal-entry{position:relative;display:grid;grid-template-columns:54px 1fr auto;column-gap:7px;row-gap:2px;align-items:start;padding:8px 7px 8px 8px;border:1px solid rgba(255,255,255,.055);border-radius:11px;background:rgba(255,255,255,.025);min-height:34px}
+.lm-journal-date{padding:6px 3px 2px;color:#8a9b99;font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.lm-journal-entry{position:relative;display:grid;grid-template-columns:54px 1fr auto;column-gap:6px;row-gap:1px;align-items:start;padding:7px 6px 7px 7px;border:1px solid rgba(255,255,255,.055);border-radius:10px;background:rgba(255,255,255,.025);min-height:31px}
 .lm-journal-entry time{grid-column:1;color:#80918f;font-size:9px;line-height:1.5;font-variant-numeric:tabular-nums;padding-top:1px}
 .lm-journal-type{grid-column:2;color:#67e6de;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lm-journal-text{grid-column:2;color:#d7e2e0;font-size:10px;line-height:1.35;word-break:break-word}
-.lm-journal-actions{grid-column:3;grid-row:1 / span 2;display:flex;gap:3px;align-self:start}
-.lm-journal-actions button{width:25px!important;height:25px!important;min-width:25px!important;padding:0!important;border:1px solid rgba(156,255,248,.08)!important;border-radius:7px!important;background:rgba(255,255,255,.025)!important;color:#91a5a2!important;font-size:12px!important;line-height:1!important;box-shadow:none!important}
+.lm-journal-actions{grid-column:3;grid-row:1 / span 2;display:flex;gap:2px;align-self:start}
+.lm-journal-actions button{width:20px!important;height:20px!important;min-width:20px!important;padding:0!important;border:1px solid rgba(156,255,248,.07)!important;border-radius:6px!important;background:rgba(255,255,255,.025)!important;color:#91a5a2!important;font-size:10px!important;line-height:1!important;box-shadow:none!important}
 .lm-journal-actions button:hover{background:rgba(69,238,228,.08)!important;color:#dffaf7!important}
 .lm-journal-empty{padding:18px 8px;text-align:center;color:#748684;font-size:10px;line-height:1.45}
-@media(max-width:600px){.lm-history-composer-row{grid-template-columns:1fr auto}.lm-history-composer select{grid-column:1}.lm-history-composer textarea{grid-column:1}.lm-history-save{grid-column:2;grid-row:1 / span 2;align-self:stretch}.lm-journal-entry{grid-template-columns:49px 1fr auto}.lm-journal-actions button{width:23px!important;height:23px!important;min-width:23px!important}}
+@media(max-width:600px){.lm-history-composer-row{grid-template-columns:1fr auto}.lm-history-composer select{grid-column:1}.lm-history-composer textarea{grid-column:1}.lm-history-save{grid-column:2;grid-row:1 / span 2;align-self:stretch}.lm-journal-entry{grid-template-columns:49px 1fr auto}.lm-journal-actions button{width:19px!important;height:19px!important;min-width:19px!important;font-size:9px!important}}
