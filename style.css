@@ -529,4 +529,10 @@
  .lm-tabs button{padding:5px 9px!important;min-height:26px!important}
  .lm-card{padding:10px!important;border-radius:19px!important}
  .lm-journal-entry{grid-template-columns:42px 1fr auto!important;border-radius:18px!important}
-                                                    }
+}
+
+/* v0.4.4 — compact current user-feeling chips */
+.lm-user-feelings{margin-top:8px}
+.lm-feeling-chips{display:flex;flex-wrap:wrap;gap:5px}
+.lm-feeling-chips span{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;background:rgba(33,156,201,.16);border:1px solid rgba(93,215,244,.32);box-shadow:0 0 8px rgba(74,211,244,.08);font-size:11px;line-height:1.1;color:#e9fbff}
+.lm-feeling-chips i{font-style:normal;color:#9eeeff}
