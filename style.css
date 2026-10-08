@@ -362,41 +362,7 @@
   linear-gradient(145deg,rgba(8,39,64,.96),rgba(3,19,34,.97))!important;
  box-shadow:0 0 38px rgba(49,207,255,.16),-16px 0 60px rgba(0,0,0,.45)!important;
 }
-/* decorative wolf ears */
-.lm-panel::before{
- content:"";
- position:absolute;
- z-index:3;
- left:24px;
- top:-12px;
- width:92px;
- height:66px;
- pointer-events:none;
- background:
-  radial-gradient(ellipse at 29% 72%,rgba(239,244,255,.92) 0 10%,transparent 11%),
-  linear-gradient(145deg,#d63869 0%,#a52150 62%,#741832 100%);
- clip-path:polygon(0 100%,22% 8%,48% 100%,52% 100%,78% 8%,100% 100%);
- filter:drop-shadow(0 0 5px rgba(90,226,255,.8));
- opacity:.98;
-}
-/* decorative paws: four pads + central pad, stylized with gradients */
-.lm-panel::after{
- content:"";
- position:absolute;
- z-index:3;
- left:17px;
- bottom:7px;
- width:100px;
- height:43px;
- pointer-events:none;
- background:
-  radial-gradient(circle at 22% 24%,#cf3d6c 0 8%,transparent 9%),
-  radial-gradient(circle at 40% 12%,#cf3d6c 0 8%,transparent 9%),
-  radial-gradient(circle at 60% 12%,#cf3d6c 0 8%,transparent 9%),
-  radial-gradient(circle at 78% 25%,#cf3d6c 0 8%,transparent 9%),
-  radial-gradient(ellipse at 50% 66%,#9d234c 0 25%,transparent 26%);
- filter:drop-shadow(0 0 5px rgba(90,226,255,.78));
-}
+/* Wolf ears and paw decorations removed in v0.4.3 by design. */
 .lm-panel > #lmBody{position:relative;z-index:2}
 
 .lm-head{
@@ -563,4 +529,4 @@
  .lm-tabs button{padding:5px 9px!important;min-height:26px!important}
  .lm-card{padding:10px!important;border-radius:19px!important}
  .lm-journal-entry{grid-template-columns:42px 1fr auto!important;border-radius:18px!important}
- }
+                                                    }
