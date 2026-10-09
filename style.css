@@ -652,3 +652,10 @@
 .lm-npc-edit-actions button{padding:7px 12px!important;border-radius:9px!important;font-size:11px!important;cursor:pointer}
 .lm-npc-edit-cancel{border:1px solid var(--lm-line)!important;background:rgba(255,255,255,.04)!important;color:var(--lm-text)!important}
 @media(max-width:480px){.lm-npc-edit-modal{padding:10px}.lm-npc-edit-card{padding:13px;border-radius:13px}.lm-npc-row-footer{gap:6px}.lm-npc-row-footer select{max-width:calc(100% - 74px)}}
+
+
+/* v0.4.16 — portal NPC editor above SillyTavern mobile layout */
+.lm-npc-edit-modal{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;box-sizing:border-box!important;z-index:2147483000!important;display:flex;align-items:center!important;justify-content:center!important;overflow-y:auto!important;overscroll-behavior:contain;padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom))!important;background:rgba(1,8,10,.82);}
+.lm-npc-edit-modal.hidden{display:none!important}
+.lm-npc-edit-card{width:min(100%,420px)!important;max-height:calc(100dvh - 32px)!important;max-height:calc(100vh - 32px)!important;overflow-y:auto!important;overscroll-behavior:contain;margin:auto!important;flex-shrink:0}
+@media(max-width:480px){.lm-npc-edit-modal{align-items:center!important;padding: max(12px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom))!important}.lm-npc-edit-card{width:100%!important;max-width:420px!important;max-height:calc(100dvh - 24px)!important;padding:13px!important}}
