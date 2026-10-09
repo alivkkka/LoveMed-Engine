@@ -557,3 +557,34 @@
 .lm-relationship-mode{display:grid;gap:6px;margin-top:9px;padding:8px 9px;border:1px solid rgba(243,109,155,.16);border-radius:13px;background:rgba(141,39,72,.07);font-size:12px;color:#dceceb}
 .lm-relationship-mode select{width:100%;padding:8px 10px;border:1px solid var(--lm-line);background:#071113;color:#fff;border-radius:999px!important;font-size:12px;outline:none}
 .lm-relationship-mode select:focus{border-color:rgba(69,238,228,.55);box-shadow:0 0 0 2px rgba(69,238,228,.08)}
+
+/* v0.4.10 — compact NPC relationship manager */
+.lm-contacts-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.lm-contacts-head h3{margin-bottom:4px}
+.lm-npc-add{width:32px!important;height:32px!important;min-width:32px!important;padding:0!important;border-radius:50%!important;border:1px solid rgba(69,238,228,.48)!important;background:rgba(69,238,228,.10)!important;color:var(--lm-teal2)!important;font-size:22px!important;line-height:1;cursor:pointer}
+.lm-npc-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:7px;margin:8px 0 12px;padding:10px;border:1px solid var(--lm-line);border-radius:13px;background:#071113aa}
+.lm-npc-form.hidden{display:none!important}
+.lm-npc-form input,.lm-npc-form select,.lm-npc-row select{min-width:0;width:100%;padding:7px 8px;border:1px solid var(--lm-line);border-radius:9px;background:#0b1a1d;color:var(--lm-text);font-size:11px}
+.lm-npc-save{padding:6px 10px!important;border:1px solid #45eee455!important;border-radius:9px!important;background:#45eee41a!important;color:var(--lm-teal2)!important;font-size:11px!important;white-space:nowrap;cursor:pointer}
+.lm-npc-row{display:grid;grid-template-columns:22px minmax(65px,1fr) minmax(130px,1.1fr) 29px;gap:8px;align-items:center;margin-top:7px;padding:7px 8px;border:1px solid rgba(69,238,228,.17);border-radius:12px;background:linear-gradient(110deg,#45eee40b,#8d27480b)}
+.lm-npc-row-heart{color:#f36d9b;text-align:center;font-size:16px}
+.lm-npc-row-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:750;color:var(--lm-text)}
+.lm-npc-row select{padding:6px 5px;font-size:10px}
+.lm-npc-row .lm-npc-delete{width:27px!important;height:27px!important;min-width:27px!important;font-size:16px!important}
+@media(max-width:480px){.lm-npc-form{grid-template-columns:1fr 1fr}.lm-npc-save{grid-column:1/-1}.lm-npc-row{grid-template-columns:18px minmax(55px,1fr) minmax(110px,1.15fr) 27px;gap:5px;padding:6px}.lm-npc-row select{font-size:9px}}
+
+
+/* v0.4.10 — compact NPC relationship manager */
+.lm-contacts-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.lm-contacts-head h3{margin-bottom:4px}
+.lm-npc-add{width:32px!important;height:32px!important;min-width:32px!important;padding:0!important;border-radius:50%!important;border:1px solid rgba(69,238,228,.48)!important;background:rgba(69,238,228,.10)!important;color:var(--lm-teal2)!important;font-size:22px!important;line-height:1;cursor:pointer}
+.lm-npc-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:7px;margin:8px 0 12px;padding:10px;border:1px solid var(--lm-line);border-radius:13px;background:#071113aa}
+.lm-npc-form.hidden{display:none!important}
+.lm-npc-form input,.lm-npc-form select,.lm-npc-row select{min-width:0;width:100%;padding:7px 8px;border:1px solid var(--lm-line);border-radius:9px;background:#0b1a1d;color:var(--lm-text);font-size:11px}
+.lm-npc-save{padding:6px 10px!important;border:1px solid #45eee455!important;border-radius:9px!important;background:#45eee41a!important;color:var(--lm-teal2)!important;font-size:11px!important;white-space:nowrap;cursor:pointer}
+.lm-npc-row{display:grid;grid-template-columns:22px minmax(65px,1fr) minmax(130px,1.1fr) 29px;gap:8px;align-items:center;margin-top:7px;padding:7px 8px;border:1px solid rgba(69,238,228,.17);border-radius:12px;background:linear-gradient(110deg,#45eee40b,#8d27480b)}
+.lm-npc-row-heart{color:#f36d9b;text-align:center;font-size:16px}
+.lm-npc-row-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:750;color:var(--lm-text)}
+.lm-npc-row select{padding:6px 5px;font-size:10px}
+.lm-npc-row .lm-npc-delete{width:27px!important;height:27px!important;min-width:27px!important;font-size:16px!important}
+@media(max-width:480px){.lm-npc-form{grid-template-columns:1fr 1fr}.lm-npc-save{grid-column:1/-1}.lm-npc-row{grid-template-columns:18px minmax(55px,1fr) minmax(110px,1.15fr) 27px;gap:5px;padding:6px}.lm-npc-row select{font-size:9px}}
