@@ -58,16 +58,35 @@ intensity:'Предпочтение более выраженной эмоцио
 
 const CAT_LABEL={psych:'Психологические',physical:'Физические / сенсорные',situational:'Ситуационные',romantic:'Романтические'};
 
-const defaults=()=>({enabled:true,autoTrack:true,autoReaction:true,relationshipMode:'romantic',relation:Object.fromEntries(REL_FIELDS.map(([k])=>[k,0])),activeFeelings:[],lastShift:'',diagnosis:[],diagnosisManual:{added:[],removed:[]},anamnesis:[],anamnesisAt:0,reactionIntensity:55,reactionChance:35,reactionCooldown:4,reactionCooldownRemaining:0,lastReaction:'',lastReactionId:'',randomKinkId:'',randomKinkIds:[],randomKinkAt:0,contacts:[],history:[],historyNotice:true,anamnesisSummary:'',userFeelings:[],userEmotionScores:{...USER_FEELING_DEFAULTS},charName:'',updatedAt:Date.now(),diagnostics:{lastParseAt:0,lastParseStatus:'Ожидает проверки',lastParseError:''}});
+const defaults=()=>({enabled:true,autoTrack:true,autoReaction:true,relationshipMode:'romantic',npcRelationships:[],relation:Object.fromEntries(REL_FIELDS.map(([k])=>[k,0])),activeFeelings:[],lastShift:'',diagnosis:[],diagnosisManual:{added:[],removed:[]},anamnesis:[],anamnesisAt:0,reactionIntensity:55,reactionChance:35,reactionCooldown:4,reactionCooldownRemaining:0,lastReaction:'',lastReactionId:'',randomKinkId:'',randomKinkIds:[],randomKinkAt:0,contacts:[],history:[],historyNotice:true,anamnesisSummary:'',userFeelings:[],userEmotionScores:{...USER_FEELING_DEFAULTS},charName:'',updatedAt:Date.now(),diagnostics:{lastParseAt:0,lastParseStatus:'Ожидает проверки',lastParseError:''}});
 const ctx=()=>{try{return getContext?.()||globalThis.SillyTavern?.getContext?.()||{};}catch{return {};}};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid=()=>crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`;
 const clamp=(n,min=0,max=REL_MAX)=>Math.max(min,Math.min(max,Number(n)||0));
 
+/* Shared relationship core. Main {{char}} and future NPC records use the same schema/rules. */
+function createRelationshipRecord(raw={}){
+ const mode=normalizeRelationshipMode(raw.mode||raw.relationshipMode||'neutral');
+ const relation=Object.fromEntries(REL_FIELDS.map(([k])=>[k,clamp(raw.relation?.[k])]));
+ return {id:String(raw.id||uid()),name:String(raw.name||'NPC').slice(0,100),mode,relation,
+  activeFeelings:(Array.isArray(raw.activeFeelings)?raw.activeFeelings:[]).filter(k=>REL_LABEL[k]&&(mode==='romantic'||!ROMANTIC_FIELDS.includes(k))).slice(0,6),
+  lastShift:String(raw.lastShift||'').slice(0,300),updatedAt:Number(raw.updatedAt)||Date.now()};
+}
+function normalizeRelationshipRecord(raw){return createRelationshipRecord(raw&&typeof raw==='object'?raw:{});}
+function relationshipAllows(mode,key){return mode==='romantic'||!ROMANTIC_FIELDS.includes(key);}
+function applyRelationshipChanges(record,deltas={},activeFeelings){
+ const r=normalizeRelationshipRecord(record);
+ for(const [key,value] of Object.entries(deltas||{}))if(key in r.relation&&relationshipAllows(r.mode,key))r.relation[key]=clamp(r.relation[key]+Number(value));
+ if(Array.isArray(activeFeelings))r.activeFeelings=activeFeelings.filter(k=>REL_LABEL[k]&&relationshipAllows(r.mode,k)).slice(0,6);
+ r.updatedAt=Date.now();return r;
+}
 function merge(raw){
  const d=defaults(),s=Object.assign(d,raw||{});
  s.relation=Object.assign({},d.relation,raw?.relation||{});
- for(const k of ['activeFeelings','diagnosis','anamnesis','contacts','history','userFeelings'])if(!Array.isArray(s[k]))s[k]=[];
+ for(const k of ['activeFeelings','diagnosis','anamnesis','contacts','history','userFeelings','npcRelationships'])if(!Array.isArray(s[k]))s[k]=[];
+ s.npcRelationships=s.npcRelationships.map(normalizeRelationshipRecord);
+ // Migrate the old contact list into compact relationship records without changing existing contact notes.
+ for(const contact of s.contacts){if(!contact?.name)continue;const key=String(contact.id||contact.name).toLowerCase();if(!s.npcRelationships.some(r=>String(r.id).toLowerCase()===key||r.name.toLowerCase()===String(contact.name).toLowerCase()))s.npcRelationships.push(createRelationshipRecord({id:contact.id||uid(),name:contact.name,mode:'neutral'}));}
  s.userFeelings=s.userFeelings.filter(k=>USER_FEELING_LABEL[k]).slice(0,6);
  s.userEmotionScores=Object.assign({},USER_FEELING_DEFAULTS,raw?.userEmotionScores||{});
  for(const k of Object.keys(s.userEmotionScores))s.userEmotionScores[k]=Math.max(0,Math.min(100,Number(s.userEmotionScores[k])||0));
@@ -346,7 +365,7 @@ function historyPage(s){
  </section></div>`;
 }
 function visible(s){
- const allowed=k=>s.relationshipMode!=='platonic'&&s.relationshipMode!=='neutral'||!ROMANTIC_FIELDS.includes(k);
+ const allowed=k=>relationshipAllows(s.relationshipMode,k);
  const a=(s.activeFeelings||[]).filter(k=>REL_LABEL[k]&&allowed(k));
  const r=REL_FIELDS.map(([k])=>[k,clamp(s.relation[k])]).filter(x=>x[1]>0&&allowed(x[0])).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
  const fallback=(s.relationshipMode==='romantic'?DEFAULT_VISIBLE:['trust','affection','sympathy','friendship','respect','tenderness']).filter(allowed);
@@ -360,13 +379,13 @@ function userVisibleFeelings(s){
 }
 function parsePacket(text){const o='[[LOVEMED_STATE]]',c='[[/LOVEMED_STATE]]',p=text.lastIndexOf(o);if(p<0)return null;const q=text.indexOf(c,p+o.length);if(q<0)return null;try{return{packet:JSON.parse(text.slice(p+o.length,q).trim()),start:p,end:q+c.length};}catch{return null;}}
 function applyPacket(s,p){
- if(p.relation)for(const[k,v]of Object.entries(p.relation)){if(!(k in s.relation))continue;if((s.relationshipMode==='platonic'||s.relationshipMode==='neutral')&&ROMANTIC_FIELDS.includes(k))continue;s.relation[k]=clamp(s.relation[k]+Number(v));}
- if(Array.isArray(p.active_feelings))s.activeFeelings=p.active_feelings.filter(k=>REL_LABEL[k]&&(s.relationshipMode!=='platonic'&&s.relationshipMode!=='neutral'||!ROMANTIC_FIELDS.includes(k))).slice(0,6);
+ const mainRelation=applyRelationshipChanges({id:'main-char',name:charName(),mode:s.relationshipMode,relation:s.relation,activeFeelings:s.activeFeelings},p.relation,p.active_feelings);
+ s.relation=mainRelation.relation;s.activeFeelings=mainRelation.activeFeelings;
  if(p.user_emotion_scores&&typeof p.user_emotion_scores==='object')for(const[k,v]of Object.entries(p.user_emotion_scores))if(k in USER_FEELING_LABEL)s.userEmotionScores[k]=Math.max(0,Math.min(100,Number(v)||0));
  if(Array.isArray(p.user_feelings))s.userFeelings=p.user_feelings.filter(k=>USER_FEELING_LABEL[k]).slice(0,6);
  if(!p.user_emotion_scores&&Array.isArray(p.user_feelings)){Object.keys(s.userEmotionScores).forEach(k=>s.userEmotionScores[k]=0);s.userFeelings.forEach(k=>s.userEmotionScores[k]=70);}
  if(p.shift)s.lastShift=String(p.shift).slice(0,300);
- if(Array.isArray(p.contacts))for(const n of p.contacts){if(!n?.name)continue;let x=s.contacts.find(v=>v.name.toLowerCase()===String(n.name).toLowerCase());if(!x){x={id:uid(),name:String(n.name),relation:'Не определено',notes:''};s.contacts.push(x);}x.relation=String(n.relation||x.relation).slice(0,100);x.notes=String(n.notes||x.notes).slice(0,300);x.updatedAt=Date.now();}
+ if(Array.isArray(p.contacts))for(const n of p.contacts){if(!n?.name)continue;let x=s.contacts.find(v=>v.name.toLowerCase()===String(n.name).toLowerCase());if(!x){x={id:uid(),name:String(n.name),relation:'Не определено',notes:''};s.contacts.push(x);}x.relation=String(n.relation||x.relation).slice(0,100);x.notes=String(n.notes||x.notes).slice(0,300);x.updatedAt=Date.now();let nr=s.npcRelationships.find(v=>v.name.toLowerCase()===x.name.toLowerCase());if(!nr){nr=createRelationshipRecord({id:x.id,name:x.name,mode:'neutral'});s.npcRelationships.push(nr);}else{nr.name=x.name;nr.updatedAt=Date.now();}}
  if(s.lastShift){s.history.unshift({ts:Date.now(),type:'Состояние',text:s.lastShift});s.history=s.history.slice(0,80);}
 }
 function parseLatest(){
