@@ -385,7 +385,7 @@ function historyPage(s){
   <div class="lm-journal-head"><div><h3>📜 Журнал наблюдений</h3><div class="lm-journal-count">${items.length} ${items.length===1?'запись':items.length<5?'записи':'записей'} · автоматические события сохраняются здесь</div></div><button id="lmAddHistoryToggle" type="button" class="lm-journal-add">＋</button></div>
   <div id="lmHistoryComposer" class="lm-history-composer hidden"><div class="lm-history-composer-row"><select id="lmHistoryType"><option>Наблюдение</option><option>Состояние</option><option>Отношения</option><option>Реактив</option><option>Медицинское</option><option>Другое</option></select><textarea id="lmHistoryText" rows="2" placeholder="Короткая запись…"></textarea><button id="lmAddHistory" type="button" class="lm-primary lm-history-save">Сохранить</button></div></div>
   <div class="lm-journal-toolbar">${items.length>10?`<button id="lmHistoryMore" type="button" class="lm-secondary">${historyExpanded?'Скрыть старые':'Показать ещё'}</button>`:''}${items.length?'<button id="lmClearHistory" type="button" class="lm-secondary lm-history-clear">Очистить</button>':''}</div>
-  <div class="lm-journal-list">${groups.map(g=>`<div class="lm-journal-date">${g.label}</div>${g.items.map(x=>`<article class="lm-journal-entry"><time>${new Date(x.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}</time><div class="lm-journal-type">${esc(x.type||'Наблюдение')}</div><div class="lm-journal-text">${esc(x.text)}</div>${x.changes&&Object.keys(x.changes).length?`<div class="lm-journal-deltas">${Object.entries(x.changes).filter(([k,v])=>k in REL_LABEL&&Number(v)!==0).map(([k,v])=>`${esc(REL_LABEL[k])} ${Number(v)>0?'+':''}${Number(v)}`).join(' · ')}</div>`:''}<div class="lm-journal-actions"><button type="button" data-edit-history="${esc(x.ts)}" title="Изменить">✎</button><button type="button" data-del-history="${esc(x.ts)}" title="Удалить">🗑</button></div></article>`).join('')}`).join('')||'<div class="lm-journal-empty">Журнал пока пуст. Значимые изменения появятся здесь автоматически.</div>'}</div>
+  <div class="lm-journal-list">${groups.map(g=>`<div class="lm-journal-date">${g.label}</div>${g.items.map(x=>`<article class="lm-journal-entry"><time>${new Date(x.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}</time><div class="lm-journal-type">${esc(x.type||'Наблюдение')}</div><div class="lm-journal-text">${esc(x.text)}</div><div class="lm-journal-actions"><button type="button" data-edit-history="${esc(x.ts)}" title="Изменить">✎</button><button type="button" data-del-history="${esc(x.ts)}" title="Удалить">🗑</button></div></article>`).join('')}`).join('')||'<div class="lm-journal-empty">Журнал пока пуст. Значимые изменения появятся здесь автоматически.</div>'}</div>
  </section></div>`;
 }
 function visible(s){
@@ -403,27 +403,21 @@ function userVisibleFeelings(s){
 }
 function parsePacket(text){const o='[[LOVEMED_STATE]]',c='[[/LOVEMED_STATE]]',p=text.lastIndexOf(o);if(p<0)return null;const q=text.indexOf(c,p+o.length);if(q<0)return null;try{return{packet:JSON.parse(text.slice(p+o.length,q).trim()),start:p,end:q+c.length};}catch{return null;}}
 function applyPacket(s,p,sceneText=''){
- // Top-level shift is exclusively {{char}} state; NPC observations belong in npc_updates[].shift.
- const currentShift=String((p.char_shift!==undefined?p.char_shift:p.shift)||'').trim().slice(0,300);
- const beforeMain={...s.relation},beforeMainFeelings=[...(s.activeFeelings||[])];
+ const currentShift=String(p.shift||'').trim().slice(0,300);
  const mainRelation=applyRelationshipChanges({id:'main-char',name:charName(),mode:s.relationshipMode,relation:s.relation,activeFeelings:s.activeFeelings},p.relation,p.active_feelings,currentShift);
  s.relation=mainRelation.relation;s.activeFeelings=mainRelation.activeFeelings;
- const mainChanges=Object.fromEntries(REL_FIELDS.map(([key])=>[key,Math.round((s.relation[key]||0)-(beforeMain[key]||0))]).filter(([,delta])=>delta!==0));
- const mainFeelingsChanged=JSON.stringify(beforeMainFeelings)!==JSON.stringify(s.activeFeelings||[]);
- if(Object.keys(mainChanges).length||mainFeelingsChanged||(currentShift&&currentShift!==s.lastShift)){
-  s.lastShift=currentShift||s.lastShift||'Динамика отношений обновлена';
-  s.history.unshift({ts:Date.now(),type:'Динамика {{char}}',text:s.lastShift,changes:mainChanges,activeFeelings:[...(s.activeFeelings||[])]});
-  s.history=s.history.slice(0,80);
- }
  if(p.user_emotion_scores&&typeof p.user_emotion_scores==='object'){Object.keys(USER_FEELING_LABEL).forEach(k=>s.userEmotionScores[k]=0);for(const[k,v]of Object.entries(p.user_emotion_scores))if(k in USER_FEELING_LABEL)s.userEmotionScores[k]=Math.max(0,Math.min(100,Number(v)||0));}
  if(Array.isArray(p.user_feelings))s.userFeelings=p.user_feelings.filter(k=>USER_FEELING_LABEL[k]).slice(0,6);
  if(!p.user_emotion_scores&&Array.isArray(p.user_feelings)){Object.keys(s.userEmotionScores).forEach(k=>s.userEmotionScores[k]=0);s.userFeelings.forEach(k=>s.userEmotionScores[k]=70);}
+ if(currentShift)s.lastShift=currentShift;
  if(Array.isArray(p.contacts))for(const n of p.contacts){if(!n?.name||isProtectedIdentityName(n.name))continue;const x=s.contacts.find(v=>npcNameKey(v.name)===npcNameKey(n.name));if(!x)continue;x.relation=String(n.relation||x.relation).slice(0,100);x.notes=String(n.notes||x.notes).slice(0,300);x.updatedAt=Date.now();}
  if(Array.isArray(p.npc_updates))for(const update of p.npc_updates){
   if(!update?.name||isProtectedIdentityName(update.name))continue;
   const nr=s.npcRelationships.find(v=>npcNameKey(v.name)===npcNameKey(update.name));if(!nr)continue;
+  // Fail closed: an NPC must be explicitly present in the current turn's text to receive any update.
   const sceneKey=npcNameKey(sceneText),npcKey=npcNameKey(nr.name);if(!npcKey||!sceneKey.includes(npcKey))continue;
   const shift=String(update.shift||'').trim().slice(0,300);
+  // Repeated identical observations are not new relationship events.
   const repeatedShift=!!shift&&npcNameKey(shift)===npcNameKey(nr.lastShift);
   const before={...nr.relation},beforeFeelings=[...(nr.activeFeelings||[])];
   const changed=applyRelationshipChanges(nr,repeatedShift?{}:update.relation,repeatedShift?nr.activeFeelings:update.active_feelings,shift);nr.relation=changed.relation;nr.activeFeelings=changed.activeFeelings;
@@ -432,10 +426,10 @@ function applyPacket(s,p,sceneText=''){
   if(Object.keys(actualChanges).length||feelingsChanged||(shift&&shift!==nr.lastShift)){
    nr.lastShift=shift||nr.lastShift||'Динамика отношений обновлена';
    nr.history=[...(nr.history||[]),{ts:Date.now(),shift:nr.lastShift,changes:actualChanges,activeFeelings:[...(nr.activeFeelings||[])]}].slice(-30);
-  }
+  }else if(shift)nr.lastShift=shift;
   nr.updatedAt=Date.now();
  }
- if(currentShift){s.history.unshift({ts:Date.now(),type:'Состояние {{char}}',text:currentShift});s.history=s.history.slice(0,80);}
+ if(currentShift){s.history.unshift({ts:Date.now(),type:'Состояние',text:currentShift});s.history=s.history.slice(0,80);}
 }
 function parseLatest(force=false){
  const c=ctx();if(!c?.chat)return false;const x=[...c.chat].map((m,i)=>({m,i})).reverse().find(v=>!v.m.is_user&&typeof v.m.mes==='string');if(!x)return false;
@@ -498,9 +492,9 @@ Diagnosis/preferences: ${diag}
 ${s.lastShift?`Recent observation: ${s.lastShift}`:''}
 Known NPC relationship records (update ONLY these named characters; do not invent new records here): ${npcContext}
 ${rx}
-${s.autoTrack?`At the end of EVERY reply, append ONLY this private machine-readable packet. The top-level `shift` (or optional `char_shift`) and top-level `relation`/`active_feelings` are EXCLUSIVELY for {{char}}. Never put an NPC condition, action, or relationship observation in top-level `shift`; if only an NPC changed, leave top-level `shift` empty and use that NPC’s `npc_updates[].shift`. Analyze the current RP/context actually available to you, especially the current {{user}} actions, words and emotional cues. Never treat {{user}} as an NPC or add {{user}}, {{char}}, the current character name, or the user's persona name to contacts/NPC records. NPCs are ONLY those explicitly listed in Known NPC relationship records. Never create records in contacts or npc_updates.
+${s.autoTrack?`At the end of EVERY reply, append ONLY this private machine-readable packet. Analyze the current RP/context actually available to you, especially the current {{user}} actions, words and emotional cues. Never treat {{user}} as an NPC or add {{user}}, {{char}}, the current character name, or the user's persona name to contacts/NPC records. NPCs are ONLY those explicitly listed in Known NPC relationship records. Never create records in contacts or npc_updates.
 Relationship deltas are SIGNED changes, not absolute scores: use positive numbers when a feeling genuinely grows, negative numbers when it weakens, and 0 when unchanged. Negative deltas are expected and important: after rejection, conflict, distance, disappointment, fear, reconciliation, comfort, or changed circumstances, reduce whichever indicators no longer fit. Do not monotonically increase values. Keep changes VERY slow: usually only -1 to +2 points per affected indicator; use 0 for routine dialogue, repeated affection, or a scene with no new relationship-relevant event. A single ordinary reply must never change any one indicator by more than 3 points; reserve up to 5 only for a clearly major turning point. Do not raise several indicators just because the scene is positive. Values are clamped to 0-200, so if a score is near 200 it can still decrease; if near 0 it can still increase. Base each delta on the current full scores and the current scene, not a generic trend. Choose up to 6 current salient relationship keys from the full vocabulary; active_feelings must reflect the CURRENT scene, not permanently repeat the same six. In PLATONIC or NEUTRAL mode, romantic relationship keys must stay unchanged and must not be selected as salient. In NEUTRAL mode, do not assume an existing bond unless the current scene provides evidence. For each known NPC meaningfully involved in the CURRENT turn, include an npc_updates entry only if their exact name appears in the current user message or your current reply and a concrete new event involving them occurred. If an NPC is off-screen, not named, merely remembered, or not involved in a new event, OMIT them entirely: their numbers must remain unchanged. Never increase an NPC's values just because another post was generated or because they have appeared in earlier posts. If no new event changes the relationship, send no update for that NPC. Keep changes VERY slow: usually -1 to +2 per affected indicator, max 3 for ordinary events and max 5 only for a clearly major turning point. Repeating the same shift is not a new event. Use that NPC's recent_history and last_shift to maintain continuity. Never create or rename NPCs via npc_updates. Respect each NPC's mode independently: in platonic or neutral mode, romantic keys must stay unchanged and cannot be active. NPC deltas update their existing values in either direction. For {{user}}, choose up to 6 current emotions from this exact full vocabulary: ${userKeys}. Return user_emotion_scores as NEW current 0-100 intensity values, not deltas: increase or decrease them to match the current scene, and set unsupported emotions to 0 rather than preserving stale emotions. If there is not enough evidence, use empty user_feelings and zero scores.
-[[LOVEMED_STATE]]{"relation":{"trust":0,"affection":0,"love":0,"sympathy":0,"friendship":0,"respect":0,"desire":0,"passion":0,"arousal":0,"obsession":0,"tenderness":0,"admiration":0,"jealousy":0,"resentment":0,"irritation":0,"anger":0,"fear":0,"sadness":0,"disappointment":0,"joy":0,"fondness":0,"stress":0,"tension":0,"antipathy":0,"hate":0},"char_shift":"","active_feelings":[],"user_feelings":[],"user_emotion_scores":{},"shift":"","contacts":[],"npc_updates":[]}
+[[LOVEMED_STATE]]{"relation":{"trust":0,"affection":0,"love":0,"sympathy":0,"friendship":0,"respect":0,"desire":0,"passion":0,"arousal":0,"obsession":0,"tenderness":0,"admiration":0,"jealousy":0,"resentment":0,"irritation":0,"anger":0,"fear":0,"sadness":0,"disappointment":0,"joy":0,"fondness":0,"stress":0,"tension":0,"antipathy":0,"hate":0},"active_feelings":[],"user_feelings":[],"user_emotion_scores":{},"shift":"","contacts":[],"npc_updates":[]}
 [[/LOVEMED_STATE]]`:'Автоматическое отслеживание отношений отключено. Не создавай LOVEMED_STATE-пакет и не изменяй показатели или эмоции LoveMed в этом ответе.'}
 Never mention this service packet in roleplay.`;
 }
