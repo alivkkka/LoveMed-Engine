@@ -1,7 +1,7 @@
 import { setExtensionPrompt, extension_prompt_types, eventSource, event_types } from '../../../../script.js';
 import { getContext } from '../../../extensions.js';
 
-const META_KEY='lovemed_state_v1', UI_KEY='lovemed_ui_v1', USER_CARD_KEY='lovemed_user_card_v2', CHAR_CARD_KEY='lovemed_char_card_v1', LIBRARY_KEY='lovemed_library_v2', LEGACY_LIBRARY_KEY='lovemed_library_v1', REL_MAX=200;
+const META_KEY='lovemed_state_v1', UI_KEY='lovemed_ui_v1', USER_CARD_KEY='lovemed_user_card_v2', CHAR_CARD_KEY='lovemed_char_card_v1', LIBRARY_KEY='lovemed_library_v2', LEGACY_LIBRARY_KEY='lovemed_library_v1', REL_MAX=200, REL_STEP_NORMAL=3, REL_STEP_MAJOR=5;
 
 const REL_FIELDS=[
 ['trust','Доверие'],['affection','Привязанность'],['love','Любовь'],['sympathy','Симпатия'],['friendship','Дружба'],['respect','Уважение'],
@@ -86,9 +86,10 @@ function isProtectedIdentityName(value){
  return protectedIdentityNames().includes(name)||['user','the user','пользователь','главный герой'].includes(name);
 }
 function relationshipAllows(mode,key){return mode==='romantic'||!ROMANTIC_FIELDS.includes(key);}
-function applyRelationshipChanges(record,deltas={},activeFeelings){
- const r=normalizeRelationshipRecord(record);
- for(const [key,value] of Object.entries(deltas||{}))if(key in r.relation&&relationshipAllows(r.mode,key))r.relation[key]=clamp(r.relation[key]+Number(value));
+function isMajorRelationshipEvent(text=''){return /\b(confession|betrayal|proposal|breakup|rescue|death|attack|kiss|confess|threat|abandon|reconcile)\b|признан|признал|признала|предатель|измена|расставан|спас|смерт|напад|поцел|угроз|бросил|бросила|примирен|серьёзн|серьезн/i.test(String(text));}
+function applyRelationshipChanges(record,deltas={},activeFeelings,eventText=''){
+ const r=normalizeRelationshipRecord(record),maxStep=isMajorRelationshipEvent(eventText)?REL_STEP_MAJOR:REL_STEP_NORMAL;
+ for(const [key,value] of Object.entries(deltas||{}))if(key in r.relation&&relationshipAllows(r.mode,key)){const delta=Math.max(-maxStep,Math.min(maxStep,Math.round(Number(value)||0)));r.relation[key]=clamp(Math.round(r.relation[key])+delta);}
  if(Array.isArray(activeFeelings))r.activeFeelings=activeFeelings.filter(k=>REL_LABEL[k]&&relationshipAllows(r.mode,k)).slice(0,6);
  r.updatedAt=Date.now();return r;
 }
@@ -401,22 +402,27 @@ function userVisibleFeelings(s){
  return[...new Set([...selected,...ranked])].slice(0,6);
 }
 function parsePacket(text){const o='[[LOVEMED_STATE]]',c='[[/LOVEMED_STATE]]',p=text.lastIndexOf(o);if(p<0)return null;const q=text.indexOf(c,p+o.length);if(q<0)return null;try{return{packet:JSON.parse(text.slice(p+o.length,q).trim()),start:p,end:q+c.length};}catch{return null;}}
-function applyPacket(s,p){
- const mainRelation=applyRelationshipChanges({id:'main-char',name:charName(),mode:s.relationshipMode,relation:s.relation,activeFeelings:s.activeFeelings},p.relation,p.active_feelings);
+function applyPacket(s,p,sceneText=''){
+ const currentShift=String(p.shift||'').trim().slice(0,300);
+ const mainRelation=applyRelationshipChanges({id:'main-char',name:charName(),mode:s.relationshipMode,relation:s.relation,activeFeelings:s.activeFeelings},p.relation,p.active_feelings,currentShift);
  s.relation=mainRelation.relation;s.activeFeelings=mainRelation.activeFeelings;
  if(p.user_emotion_scores&&typeof p.user_emotion_scores==='object'){Object.keys(USER_FEELING_LABEL).forEach(k=>s.userEmotionScores[k]=0);for(const[k,v]of Object.entries(p.user_emotion_scores))if(k in USER_FEELING_LABEL)s.userEmotionScores[k]=Math.max(0,Math.min(100,Number(v)||0));}
  if(Array.isArray(p.user_feelings))s.userFeelings=p.user_feelings.filter(k=>USER_FEELING_LABEL[k]).slice(0,6);
  if(!p.user_emotion_scores&&Array.isArray(p.user_feelings)){Object.keys(s.userEmotionScores).forEach(k=>s.userEmotionScores[k]=0);s.userFeelings.forEach(k=>s.userEmotionScores[k]=70);}
- const currentShift=String(p.shift||'').trim().slice(0,300);
  if(currentShift)s.lastShift=currentShift;
  if(Array.isArray(p.contacts))for(const n of p.contacts){if(!n?.name||isProtectedIdentityName(n.name))continue;const x=s.contacts.find(v=>npcNameKey(v.name)===npcNameKey(n.name));if(!x)continue;x.relation=String(n.relation||x.relation).slice(0,100);x.notes=String(n.notes||x.notes).slice(0,300);x.updatedAt=Date.now();}
  if(Array.isArray(p.npc_updates))for(const update of p.npc_updates){
   if(!update?.name||isProtectedIdentityName(update.name))continue;
   const nr=s.npcRelationships.find(v=>npcNameKey(v.name)===npcNameKey(update.name));if(!nr)continue;
+  // Fail closed: an NPC must be explicitly present in the current turn's text to receive any update.
+  const sceneKey=npcNameKey(sceneText),npcKey=npcNameKey(nr.name);if(!npcKey||!sceneKey.includes(npcKey))continue;
+  const shift=String(update.shift||'').trim().slice(0,300);
+  // Repeated identical observations are not new relationship events.
+  const repeatedShift=!!shift&&npcNameKey(shift)===npcNameKey(nr.lastShift);
   const before={...nr.relation},beforeFeelings=[...(nr.activeFeelings||[])];
-  const changed=applyRelationshipChanges(nr,update.relation,update.active_feelings);nr.relation=changed.relation;nr.activeFeelings=changed.activeFeelings;
+  const changed=applyRelationshipChanges(nr,repeatedShift?{}:update.relation,repeatedShift?nr.activeFeelings:update.active_feelings,shift);nr.relation=changed.relation;nr.activeFeelings=changed.activeFeelings;
   const actualChanges=Object.fromEntries(REL_FIELDS.map(([key])=>[key,Math.round((nr.relation[key]||0)-(before[key]||0))]).filter(([,delta])=>delta!==0));
-  const shift=String(update.shift||'').trim().slice(0,300),feelingsChanged=JSON.stringify(beforeFeelings)!==JSON.stringify(nr.activeFeelings||[]);
+  const feelingsChanged=JSON.stringify(beforeFeelings)!==JSON.stringify(nr.activeFeelings||[]);
   if(Object.keys(actualChanges).length||feelingsChanged||(shift&&shift!==nr.lastShift)){
    nr.lastShift=shift||nr.lastShift||'Динамика отношений обновлена';
    nr.history=[...(nr.history||[]),{ts:Date.now(),shift:nr.lastShift,changes:actualChanges,activeFeelings:[...(nr.activeFeelings||[])]}].slice(-30);
@@ -427,7 +433,9 @@ function applyPacket(s,p){
 }
 function parseLatest(force=false){
  const c=ctx();if(!c?.chat)return false;const x=[...c.chat].map((m,i)=>({m,i})).reverse().find(v=>!v.m.is_user&&typeof v.m.mes==='string');if(!x)return false;
- const f=parsePacket(x.m.mes);if(!f)return false;const s=getState();if(!s.autoTrack&&!force)return false;applyPacket(s,f.packet);
+ const f=parsePacket(x.m.mes);if(!f)return false;const s=getState();if(!s.autoTrack&&!force)return false;
+ const previousUser=[...c.chat.slice(0,x.i)].reverse().find(m=>m?.is_user&&typeof m.mes==='string');
+ const sceneText=`${previousUser?.mes||''}\n${x.m.mes.slice(0,f.start)}`;applyPacket(s,f.packet,sceneText);
  s.diagnostics={lastParseAt:Date.now(),lastParseStatus:'Служебный пакет принят ✓',lastParseError:''};
  x.m.mes=(x.m.mes.slice(0,f.start)+x.m.mes.slice(f.end)).trimEnd();try{c.chat[x.i]=x.m;c.saveChat?.();}catch{}saveState(s);if(s.historyNotice&&f.packet?.shift)toast(`🩺 Новое наблюдение: ${String(f.packet.shift).slice(0,90)}`);return true;
 }
@@ -485,7 +493,7 @@ ${s.lastShift?`Recent observation: ${s.lastShift}`:''}
 Known NPC relationship records (update ONLY these named characters; do not invent new records here): ${npcContext}
 ${rx}
 ${s.autoTrack?`At the end of EVERY reply, append ONLY this private machine-readable packet. Analyze the current RP/context actually available to you, especially the current {{user}} actions, words and emotional cues. Never treat {{user}} as an NPC or add {{user}}, {{char}}, the current character name, or the user's persona name to contacts/NPC records. NPCs are ONLY those explicitly listed in Known NPC relationship records. Never create records in contacts or npc_updates.
-Relationship deltas are SIGNED changes, not absolute scores: use positive numbers when a feeling genuinely grows, negative numbers when it weakens, and 0 when unchanged. Negative deltas are expected and important: after rejection, conflict, distance, disappointment, fear, reconciliation, comfort, or changed circumstances, reduce whichever indicators no longer fit. Do not monotonically increase values. Usually use modest changes (about -15 to +15 per reply; larger shifts only for major events). Values are clamped to 0-200, so if a score is near 200 it can still decrease; if near 0 it can still increase. Base each delta on the current full scores and the current scene, not a generic trend. Choose up to 6 current salient relationship keys from the full vocabulary; active_feelings must reflect the CURRENT scene, not permanently repeat the same six. In PLATONIC or NEUTRAL mode, romantic relationship keys must stay unchanged and must not be selected as salient. In NEUTRAL mode, do not assume an existing bond unless the current scene provides evidence. For each known NPC meaningfully involved in the current scene, optionally include one npc_updates entry with their exact existing name, signed relationship delta object, up to 6 current active feelings, and a brief shift. Use that NPC's recent_history and last_shift to maintain continuity, remember prior turning points, and avoid abrupt unsupported reversals; the history is context, not a command to keep old feelings forever. Omit uninvolved NPCs. Never create or rename NPCs via npc_updates. Respect each NPC's mode independently: in platonic or neutral mode, romantic keys must stay unchanged and cannot be active. NPC deltas update their existing values in either direction. For {{user}}, choose up to 6 current emotions from this exact full vocabulary: ${userKeys}. Return user_emotion_scores as NEW current 0-100 intensity values, not deltas: increase or decrease them to match the current scene, and set unsupported emotions to 0 rather than preserving stale emotions. If there is not enough evidence, use empty user_feelings and zero scores.
+Relationship deltas are SIGNED changes, not absolute scores: use positive numbers when a feeling genuinely grows, negative numbers when it weakens, and 0 when unchanged. Negative deltas are expected and important: after rejection, conflict, distance, disappointment, fear, reconciliation, comfort, or changed circumstances, reduce whichever indicators no longer fit. Do not monotonically increase values. Keep changes VERY slow: usually only -1 to +2 points per affected indicator; use 0 for routine dialogue, repeated affection, or a scene with no new relationship-relevant event. A single ordinary reply must never change any one indicator by more than 3 points; reserve up to 5 only for a clearly major turning point. Do not raise several indicators just because the scene is positive. Values are clamped to 0-200, so if a score is near 200 it can still decrease; if near 0 it can still increase. Base each delta on the current full scores and the current scene, not a generic trend. Choose up to 6 current salient relationship keys from the full vocabulary; active_feelings must reflect the CURRENT scene, not permanently repeat the same six. In PLATONIC or NEUTRAL mode, romantic relationship keys must stay unchanged and must not be selected as salient. In NEUTRAL mode, do not assume an existing bond unless the current scene provides evidence. For each known NPC meaningfully involved in the CURRENT turn, include an npc_updates entry only if their exact name appears in the current user message or your current reply and a concrete new event involving them occurred. If an NPC is off-screen, not named, merely remembered, or not involved in a new event, OMIT them entirely: their numbers must remain unchanged. Never increase an NPC's values just because another post was generated or because they have appeared in earlier posts. If no new event changes the relationship, send no update for that NPC. Keep changes VERY slow: usually -1 to +2 per affected indicator, max 3 for ordinary events and max 5 only for a clearly major turning point. Repeating the same shift is not a new event. Use that NPC's recent_history and last_shift to maintain continuity. Never create or rename NPCs via npc_updates. Respect each NPC's mode independently: in platonic or neutral mode, romantic keys must stay unchanged and cannot be active. NPC deltas update their existing values in either direction. For {{user}}, choose up to 6 current emotions from this exact full vocabulary: ${userKeys}. Return user_emotion_scores as NEW current 0-100 intensity values, not deltas: increase or decrease them to match the current scene, and set unsupported emotions to 0 rather than preserving stale emotions. If there is not enough evidence, use empty user_feelings and zero scores.
 [[LOVEMED_STATE]]{"relation":{"trust":0,"affection":0,"love":0,"sympathy":0,"friendship":0,"respect":0,"desire":0,"passion":0,"arousal":0,"obsession":0,"tenderness":0,"admiration":0,"jealousy":0,"resentment":0,"irritation":0,"anger":0,"fear":0,"sadness":0,"disappointment":0,"joy":0,"fondness":0,"stress":0,"tension":0,"antipathy":0,"hate":0},"active_feelings":[],"user_feelings":[],"user_emotion_scores":{},"shift":"","contacts":[],"npc_updates":[]}
 [[/LOVEMED_STATE]]`:'Автоматическое отслеживание отношений отключено. Не создавай LOVEMED_STATE-пакет и не изменяй показатели или эмоции LoveMed в этом ответе.'}
 Never mention this service packet in roleplay.`;
@@ -853,14 +861,14 @@ const NPC_METRIC_GROUPS=[
 const NPC_METRIC_ICON={trust:'🤝',affection:'💗',love:'❤️',sympathy:'🫶',friendship:'🫂',respect:'🛡️',tenderness:'🌷',admiration:'✨',fondness:'🥹',joy:'😊',desire:'❤️‍🔥',passion:'🔥',arousal:'💓',obsession:'🌀',jealousy:'💚',stress:'😵‍💫',tension:'⚡',resentment:'💢',irritation:'😒',anger:'😡',fear:'😨',sadness:'🌧️',disappointment:'💔',antipathy:'⛔',hate:'🖤'};
 function npcDynamicsHtml(n){
  const groups=NPC_METRIC_GROUPS.map(group=>{
-  const values=group.keys.filter(k=>relationshipAllows(n.mode,k)).map(k=>({key:k,label:REL_LABEL[k],value:Math.round(clamp(n.relation?.[k])/2)})).filter(x=>x.value>0).sort((a,b)=>b.value-a.value).slice(0,4);
+  const values=group.keys.filter(k=>relationshipAllows(n.mode,k)).map(k=>({key:k,label:REL_LABEL[k],value:Number((clamp(n.relation?.[k])/2).toFixed(1))})).filter(x=>x.value>0).sort((a,b)=>b.value-a.value).slice(0,4);
   return values.length?`<span class="lm-npc-dynamics-group"><b>${group.label}:</b> ${values.map(x=>`${NPC_METRIC_ICON[x.key]||'•'} ${esc(x.label.toLocaleLowerCase())} ${x.value}%`).join(' · ')}</span>`:'';
  }).filter(Boolean);
  return `<div class="lm-npc-dynamics" title="Проценты — шкала 0–100; исходные значения отношений хранятся на шкале 0–200">${groups.join('')} ${groups.length?'':'<span class="lm-npc-dynamics-empty">Динамика пока не определена</span>'}</div>`;
 }
 function npcHistoryHtml(n){
  const history=(n.history||[]).slice(-6).reverse();
- const entries=history.map(e=>{const date=new Date(Number(e.ts)||Date.now()).toLocaleString();const changes=Object.entries(e.changes||{}).filter(([k,v])=>k in REL_LABEL&&Number(v)!==0).map(([k,v])=>`${REL_LABEL[k]} ${Number(v)>0?'+':''}${Number(v)}`).join(' · ');return `<li><time>${esc(date)}</time><span>${esc(e.shift||'Динамика отношений обновлена')}</span>${changes?`<small>${esc(changes)}</small>`:''}</li>`;}).join('');
+ const entries=history.map(e=>{const date=new Date(Number(e.ts)||Date.now()).toLocaleString();const changes=Object.entries(e.changes||{}).filter(([k,v])=>k in REL_LABEL&&Number(v)!==0).map(([k,v])=>{const pct=Number((Number(v)/2).toFixed(1));return `${REL_LABEL[k]} ${pct>0?'+':''}${pct}%`;}).join(' · ');return `<li><time>${esc(date)}</time><span>${esc(e.shift||'Динамика отношений обновлена')}</span>${changes?`<small>${esc(changes)}</small>`:''}</li>`;}).join('');
  return `<button type="button" class="lm-npc-history-toggle" data-npc-history="${esc(n.id)}" aria-expanded="false">↻ История динамики (${(n.history||[]).length})</button><div id="lmNpcHistory-${esc(n.id)}" class="lm-npc-history-panel hidden">${entries?`<ol>${entries}</ol>`:'<span class="lm-npc-history-empty">История появится после изменения отношений в РП.</span>'}</div>`;
 }
 function render(){
@@ -876,8 +884,8 @@ function render(){
 function bind(){
  bindUserCard();
  document.querySelectorAll('.lm-tabs [data-tab]').forEach(b=>b.onclick=()=>{const u=ui();u.tab=b.dataset.tab;saveUI(u);render();});
- document.querySelectorAll('[data-rel]').forEach(x=>x.oninput=async e=>{const st=getState();st.relation[e.target.dataset.rel]=Number(e.target.value);await saveState(st);render();});
- document.querySelectorAll('[data-user-feeling]').forEach(x=>x.oninput=async e=>{const st=getState();st.userEmotionScores[e.target.dataset.userFeeling]=Number(e.target.value);st.userFeelings=userVisibleFeelings(st);await saveState(st);render();});
+ document.querySelectorAll('[data-rel]').forEach(x=>{x.oninput=e=>{const st=getState(),key=e.target.dataset.rel;st.relation[key]=Number(e.target.value);const b=e.target.closest('label')?.querySelector('b');if(b)b.textContent=String(Math.round(st.relation[key]));saveState(st);};});
+ document.querySelectorAll('[data-user-feeling]').forEach(x=>{x.oninput=e=>{const st=getState(),key=e.target.dataset.userFeeling;st.userEmotionScores[key]=Number(e.target.value);st.userFeelings=userVisibleFeelings(st);const b=e.target.closest('label')?.querySelector('b');if(b)b.textContent=String(Math.round(st.userEmotionScores[key]));saveState(st);};});
  [['#lmIntensity','reactionIntensity'],['#lmChance','reactionChance'],['#lmCooldown','reactionCooldown']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('input',async e=>{const st=getState();st[k]=Number(e.target.value);await saveState(st);}));
  document.querySelector('#lmAddKink')?.addEventListener('click',()=>{
   const n=document.querySelector('#lmKinkName')?.value.trim()||'',d=document.querySelector('#lmKinkDesc')?.value.trim()||'',cat=document.querySelector('#lmKinkCat')?.value||'psych';
@@ -911,7 +919,7 @@ function bind(){
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.4.18</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.4.19</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
  document.querySelector('#lmClose').onclick=()=>{editorId=null;document.querySelector('#lmOverlay').classList.add('hidden');syncFab();};
  const overlay=document.querySelector('#lmOverlay');
  if(overlay&&!overlay.dataset.lovemedDelegated){
