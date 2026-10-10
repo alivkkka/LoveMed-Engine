@@ -658,3 +658,9 @@
 .lm-npc-edit-actions button{padding:8px 12px!important;border-radius:9px!important;font-size:11px!important;cursor:pointer}
 .lm-npc-edit-cancel{border:1px solid var(--lm-line,rgba(69,238,228,.2))!important;background:rgba(255,255,255,.04)!important;color:var(--lm-text,#d9eeee)!important}
 @media(max-width:480px){.lm-npc-edit-panel{padding:10px;gap:9px}.lm-npc-edit-panel input,.lm-npc-edit-panel textarea,.lm-npc-edit-panel select{font-size:12px}}
+
+/* Compact emotion percentages for the {{char}} patient card (no editable sliders). */
+.lm-patient-feelings{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.lm-patient-feeling{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;background:rgba(33,156,201,.13);border:1px solid rgba(93,215,244,.25);font-size:11px;line-height:1.2;color:var(--lm-text,#d9eeee)}
+.lm-patient-feeling b{color:var(--lm-accent,#63e7dc);font-weight:700}
+.lm-dice-reset:disabled{opacity:.45;cursor:not-allowed}
