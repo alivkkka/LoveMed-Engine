@@ -1,7 +1,7 @@
 import { setExtensionPrompt, extension_prompt_types, eventSource, event_types } from '../../../../script.js';
 import { getContext } from '../../../extensions.js';
 
-const META_KEY='lovemed_state_v1', UI_KEY='lovemed_ui_v1', USER_CARD_KEY='lovemed_user_card_v2', CHAR_CARD_KEY='lovemed_char_card_v1', LIBRARY_KEY='lovemed_library_v2', LEGACY_LIBRARY_KEY='lovemed_library_v1', REL_MAX=200, REL_STEP_NORMAL=3, REL_STEP_MAJOR=5;
+const META_KEY='lovemed_state_v1', UI_KEY='lovemed_ui_v1', USER_CARD_KEY='lovemed_user_card_v2', CHAR_CARD_KEY='lovemed_char_card_v1', LIBRARY_KEY='lovemed_library_v2', LEGACY_LIBRARY_KEY='lovemed_library_v1', REL_MAX=200;
 
 const REL_FIELDS=[
 ['trust','Доверие'],['affection','Привязанность'],['love','Любовь'],['sympathy','Симпатия'],['friendship','Дружба'],['respect','Уважение'],
@@ -21,7 +21,7 @@ const KINKS=[
 ['dominance','Доминирование','psych'],['submission','Подчинение','psych'],['praise','Похвала','psych'],['teasing','Поддразнивание','psych'],
 ['control','Контроль','psych'],['care','Забота','psych'],['sensitivity','Сенсорика','physical'],['restriction','Ограничение движений','physical'],
 ['roleplay','Ролевой сценарий','situational'],['risk','Риск','situational'],['romance','Романтика','romantic'],['gentle','Мягкость','romantic'],
-['intensity','Интенсивность','physical']
+['intensity','Эмоциональная выразительность','psych']
 ];
 
 const KINK_WORDS={
@@ -37,7 +37,7 @@ roleplay:['roleplay','role play','ролевая игра','ролевые иг�
 risk:['risk','danger','риск','опасн'],
 romance:['romance','romantic','романтик','романтика'],
 gentle:['gentle','soft','tender','мягк','нежн'],
-intensity:['intensity','intense','интенсив','сильн']
+intensity:['emotional expression','emotional intensity','эмоциональн выразительн','выразительн эмоций']
 };
 
 const KINK_DESC={
@@ -53,12 +53,12 @@ roleplay:'Интерес к ролевым сценариям и образам.
 risk:'Интерес к рискованным или напряжённым ситуациям.',
 romance:'Романтическая близость и эмоциональный подтекст.',
 gentle:'Предпочтение мягкой и бережной динамики.',
-intensity:'Предпочтение более выраженной эмоциональной динамики.'
+intensity:'Эмоции персонажа могут быть заметнее внешне. Это не означает сексуальную эскалацию, грубость или повышение откровенности сцены.'
 };
 
 const CAT_LABEL={psych:'Психологические',physical:'Физические / сенсорные',situational:'Ситуационные',romantic:'Романтические'};
 
-const defaults=()=>({enabled:true,autoTrack:true,autoReaction:true,relationshipMode:'romantic',npcRelationships:[],relation:Object.fromEntries(REL_FIELDS.map(([k])=>[k,0])),activeFeelings:[],lastShift:'',diagnosis:[],diagnosisManual:{added:[],removed:[]},anamnesis:[],anamnesisAt:0,reactionIntensity:55,reactionChance:35,reactionCooldown:4,reactionCooldownRemaining:0,lastReaction:'',lastReactionId:'',randomKinkId:'',randomKinkIds:[],randomKinkAt:0,contacts:[],history:[],historyNotice:true,anamnesisSummary:'',userFeelings:[],userEmotionScores:{...USER_FEELING_DEFAULTS},charName:'',updatedAt:Date.now(),diagnostics:{lastParseAt:0,lastParseStatus:'Ожидает проверки',lastParseError:''}});
+const defaults=()=>({enabled:true,autoTrack:true,autoReaction:true,relationshipMode:'romantic',npcRelationships:[],relation:Object.fromEntries(REL_FIELDS.map(([k])=>[k,0])),activeFeelings:[],lastShift:'',diagnosis:[],diagnosisManual:{added:[],removed:[]},anamnesis:[],anamnesisAt:0,reactionIntensity:55,reactionChance:35,reactionCooldown:4,reactionCooldownRemaining:0,lastReaction:'',lastReactionId:'',randomKinkId:'',randomKinkIds:[],randomKinkPendingIds:[],randomKinkAt:0,contacts:[],history:[],historyNotice:true,anamnesisSummary:'',userFeelings:[],userEmotionScores:{...USER_FEELING_DEFAULTS},charName:'',updatedAt:Date.now(),diagnostics:{lastParseAt:0,lastParseStatus:'Ожидает проверки',lastParseError:''}});
 const ctx=()=>{try{return getContext?.()||globalThis.SillyTavern?.getContext?.()||{};}catch{return {};}};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const npcNameKey=value=>String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase();
@@ -86,10 +86,9 @@ function isProtectedIdentityName(value){
  return protectedIdentityNames().includes(name)||['user','the user','пользователь','главный герой'].includes(name);
 }
 function relationshipAllows(mode,key){return mode==='romantic'||!ROMANTIC_FIELDS.includes(key);}
-function isMajorRelationshipEvent(text=''){return /\b(confession|betrayal|proposal|breakup|rescue|death|attack|kiss|confess|threat|abandon|reconcile)\b|признан|признал|признала|предатель|измена|расставан|спас|смерт|напад|поцел|угроз|бросил|бросила|примирен|серьёзн|серьезн/i.test(String(text));}
-function applyRelationshipChanges(record,deltas={},activeFeelings,eventText=''){
- const r=normalizeRelationshipRecord(record),maxStep=isMajorRelationshipEvent(eventText)?REL_STEP_MAJOR:REL_STEP_NORMAL;
- for(const [key,value] of Object.entries(deltas||{}))if(key in r.relation&&relationshipAllows(r.mode,key)){const delta=Math.max(-maxStep,Math.min(maxStep,Math.round(Number(value)||0)));r.relation[key]=clamp(Math.round(r.relation[key])+delta);}
+function applyRelationshipChanges(record,deltas={},activeFeelings){
+ const r=normalizeRelationshipRecord(record);
+ for(const [key,value] of Object.entries(deltas||{}))if(key in r.relation&&relationshipAllows(r.mode,key))r.relation[key]=clamp(r.relation[key]+Number(value));
  if(Array.isArray(activeFeelings))r.activeFeelings=activeFeelings.filter(k=>REL_LABEL[k]&&relationshipAllows(r.mode,k)).slice(0,6);
  r.updatedAt=Date.now();return r;
 }
@@ -119,6 +118,7 @@ function merge(raw){
  s.diagnostics=Object.assign({},d.diagnostics,raw?.diagnostics||{});
  s.historyNotice=raw?.historyNotice!==false;
  s.randomKinkIds=Array.isArray(raw?.randomKinkIds)?raw.randomKinkIds:((raw?.randomKinkId?[raw.randomKinkId]:[]));
+ s.randomKinkPendingIds=Array.isArray(raw?.randomKinkPendingIds)?raw.randomKinkPendingIds.filter(id=>allKinks().some(k=>k.id===id)):[];
  const dm=raw?.diagnosisManual||{};s.diagnosisManual={added:Array.isArray(dm.added)?dm.added:[],removed:Array.isArray(dm.removed)?dm.removed:[]};
  return s;
 }
@@ -259,13 +259,23 @@ function charMemberKey(ch,index=0){
  return raw.replace(/[^a-zA-Z0-9_.-]/g,'_').slice(0,100)||`member-${index}`;
 }
 function extractProfileFields(text){
- const raw=String(text||'');
- const find=(patterns)=>{for(const re of patterns){const m=raw.match(re);if(m?.[1])return m[1].trim();}return '';};
+ const lines=String(text||'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+ const field=(labels)=>{
+  const label=labels.join('|');
+  const re=new RegExp('^(?:[-*•]\\s*)?(?:'+label+')\\s*[:：=–—-]\\s*(.*?)\\s*$','i');
+  for(const line of lines){const m=line.match(re);if(!m?.[1])continue;
+   const value=m[1].replace(/\s{2,}/g,' ').replace(/[.。]+$/,'').trim();
+   if(value&&value.length<=80&&!/^(?:unknown|не указан(?:а|о)?|n\/a|none|нет данных)$/i.test(value))return value;
+  }
+  return '';
+ };
+ const ageLine=field(['возраст','age']);
+ const ageMatch=ageLine.match(/\b\d{1,3}\b/);
  return {
-  age:find([/(?:возраст|age)\s*[:\-–]?\s*(\d{1,3})/i,/\b(\d{1,3})\s*(?:лет|года|год)\b/i]),
-  sex:find([/(?:пол|sex)\s*[:\-–]?\s*([^\n,;]+)/i]),
-  gender:find([/(?:гендер|gender)\s*[:\-–]?\s*([^\n,;]+)/i]),
-  secondarySex:find([/(?:вторичн(?:ый|ая)\s+пол|secondary\s+sex|omegaverse\s+sex)\s*[:\-–]?\s*([^\n,;]+)/i])
+  age:ageMatch?ageMatch[0]:'',
+  sex:field(['биологический пол','пол','sex','biological sex']),
+  gender:field(['гендер','gender','gender identity']),
+  secondarySex:field(['вторичный пол','вторичная половая роль','secondary sex','omegaverse sex'])
  };
 }
 function extractCharacterText(ch){
@@ -402,46 +412,59 @@ function userVisibleFeelings(s){
  return[...new Set([...selected,...ranked])].slice(0,6);
 }
 function parsePacket(text){const o='[[LOVEMED_STATE]]',c='[[/LOVEMED_STATE]]',p=text.lastIndexOf(o);if(p<0)return null;const q=text.indexOf(c,p+o.length);if(q<0)return null;try{return{packet:JSON.parse(text.slice(p+o.length,q).trim()),start:p,end:q+c.length};}catch{return null;}}
-function applyPacket(s,p,sceneText=''){
- const currentShift=String(p.shift||'').trim().slice(0,300);
- const mainRelation=applyRelationshipChanges({id:'main-char',name:charName(),mode:s.relationshipMode,relation:s.relation,activeFeelings:s.activeFeelings},p.relation,p.active_feelings,currentShift);
+function applyPacket(s,p){
+ const previousRelation={...s.relation},previousFeelings=[...(s.activeFeelings||[])],previousShift=s.lastShift||'';
+ const mainRelation=applyRelationshipChanges({id:'main-char',name:charName(),mode:s.relationshipMode,relation:s.relation,activeFeelings:s.activeFeelings},p.relation,p.active_feelings);
  s.relation=mainRelation.relation;s.activeFeelings=mainRelation.activeFeelings;
+ const mainChanges=Object.fromEntries(PATIENT_FEELING_KEYS.map(key=>[key,Number((((Number(s.relation[key])||0)-(Number(previousRelation[key])||0))/2).toFixed(1))]).filter(([,delta])=>delta!==0));
+ const mainFeelingsChanged=JSON.stringify(previousFeelings)!==JSON.stringify(s.activeFeelings||[]);
+ if(Object.keys(mainChanges).length||mainFeelingsChanged){
+  const changeText=Object.entries(mainChanges).map(([key,delta])=>`${REL_LABEL[key]} ${delta>0?'+':''}${delta}%`).join(' · ');
+  const summary=[String(p.shift||'').trim(),changeText,mainFeelingsChanged?`Актуальные чувства: ${(s.activeFeelings||[]).map(k=>REL_LABEL[k]).join(', ')||'не выделены'}`:''].filter(Boolean).join(' — ');
+  s.history.unshift({ts:Date.now(),type:'Отношения {{char}}',text:summary||'Обновлены актуальные чувства'});s.history=s.history.slice(0,80);
+ }
  if(p.user_emotion_scores&&typeof p.user_emotion_scores==='object'){Object.keys(USER_FEELING_LABEL).forEach(k=>s.userEmotionScores[k]=0);for(const[k,v]of Object.entries(p.user_emotion_scores))if(k in USER_FEELING_LABEL)s.userEmotionScores[k]=Math.max(0,Math.min(100,Number(v)||0));}
  if(Array.isArray(p.user_feelings))s.userFeelings=p.user_feelings.filter(k=>USER_FEELING_LABEL[k]).slice(0,6);
  if(!p.user_emotion_scores&&Array.isArray(p.user_feelings)){Object.keys(s.userEmotionScores).forEach(k=>s.userEmotionScores[k]=0);s.userFeelings.forEach(k=>s.userEmotionScores[k]=70);}
- if(currentShift)s.lastShift=currentShift;
+ if(p.shift)s.lastShift=String(p.shift).slice(0,300);
  if(Array.isArray(p.contacts))for(const n of p.contacts){if(!n?.name||isProtectedIdentityName(n.name))continue;const x=s.contacts.find(v=>npcNameKey(v.name)===npcNameKey(n.name));if(!x)continue;x.relation=String(n.relation||x.relation).slice(0,100);x.notes=String(n.notes||x.notes).slice(0,300);x.updatedAt=Date.now();}
  if(Array.isArray(p.npc_updates))for(const update of p.npc_updates){
   if(!update?.name||isProtectedIdentityName(update.name))continue;
   const nr=s.npcRelationships.find(v=>npcNameKey(v.name)===npcNameKey(update.name));if(!nr)continue;
-  // Fail closed: an NPC must be explicitly present in the current turn's text to receive any update.
-  const sceneKey=npcNameKey(sceneText),npcKey=npcNameKey(nr.name);if(!npcKey||!sceneKey.includes(npcKey))continue;
-  const shift=String(update.shift||'').trim().slice(0,300);
-  // Repeated identical observations are not new relationship events.
-  const repeatedShift=!!shift&&npcNameKey(shift)===npcNameKey(nr.lastShift);
   const before={...nr.relation},beforeFeelings=[...(nr.activeFeelings||[])];
-  const changed=applyRelationshipChanges(nr,repeatedShift?{}:update.relation,repeatedShift?nr.activeFeelings:update.active_feelings,shift);nr.relation=changed.relation;nr.activeFeelings=changed.activeFeelings;
+  const changed=applyRelationshipChanges(nr,update.relation,update.active_feelings);nr.relation=changed.relation;nr.activeFeelings=changed.activeFeelings;
   const actualChanges=Object.fromEntries(REL_FIELDS.map(([key])=>[key,Math.round((nr.relation[key]||0)-(before[key]||0))]).filter(([,delta])=>delta!==0));
-  const feelingsChanged=JSON.stringify(beforeFeelings)!==JSON.stringify(nr.activeFeelings||[]);
+  const shift=String(update.shift||'').trim().slice(0,300),feelingsChanged=JSON.stringify(beforeFeelings)!==JSON.stringify(nr.activeFeelings||[]);
   if(Object.keys(actualChanges).length||feelingsChanged||(shift&&shift!==nr.lastShift)){
    nr.lastShift=shift||nr.lastShift||'Динамика отношений обновлена';
    nr.history=[...(nr.history||[]),{ts:Date.now(),shift:nr.lastShift,changes:actualChanges,activeFeelings:[...(nr.activeFeelings||[])]}].slice(-30);
   }else if(shift)nr.lastShift=shift;
   nr.updatedAt=Date.now();
  }
- if(currentShift){s.history.unshift({ts:Date.now(),type:'Состояние',text:currentShift});s.history=s.history.slice(0,80);}
+ if(p.shift&&s.lastShift!==previousShift){s.history.unshift({ts:Date.now(),type:'Состояние',text:s.lastShift});s.history=s.history.slice(0,80);}
 }
-function parseLatest(force=false){
+function normalizeCueText(value){return String(value||'').toLocaleLowerCase().normalize('NFKC').replace(/[ё]/g,'е').replace(/[^\p{L}\p{N}]+/gu,' ').trim();}
+function detectUsedKinks(text,ids){
+ const body=normalizeCueText(text);const used=[];
+ for(const id of ids||[]){const record=kink(id);const terms=[record.name,...(record.words||[])].map(normalizeCueText).filter(term=>term.length>=4);
+  if(terms.some(term=>body.includes(term)))used.push(id);
+ }
+ return used;
+}
+function parseLatest(){
  const c=ctx();if(!c?.chat)return false;const x=[...c.chat].map((m,i)=>({m,i})).reverse().find(v=>!v.m.is_user&&typeof v.m.mes==='string');if(!x)return false;
- const f=parsePacket(x.m.mes);if(!f)return false;const s=getState();if(!s.autoTrack&&!force)return false;
- const previousUser=[...c.chat.slice(0,x.i)].reverse().find(m=>m?.is_user&&typeof m.mes==='string');
- const sceneText=`${previousUser?.mes||''}\n${x.m.mes.slice(0,f.start)}`;applyPacket(s,f.packet,sceneText);
+ const f=parsePacket(x.m.mes),s=getState();
+ const pending=Array.isArray(s.randomKinkPendingIds)?s.randomKinkPendingIds:[];
+ const used=detectUsedKinks(x.m.mes.slice(0,f?f.start:undefined),pending);
+ if(pending.length){s.randomKinkPendingIds=[];if(used.length){const names=used.map(id=>kink(id).name);s.history.unshift({ts:Date.now(),type:'Реактив',text:`Кубик автоматически сброшен после использования: ${names.join(', ')}.`});s.history=s.history.slice(0,80);}else if(!f){s.history.unshift({ts:Date.now(),type:'Реактив',text:'Выбранные варианты кубика сброшены после следующего ответа, чтобы не переносить их в дальнейший РП.'});s.history=s.history.slice(0,80);}}
+ if(!f){if(pending.length)saveState(s);return false;}
+ applyPacket(s,f.packet);
  s.diagnostics={lastParseAt:Date.now(),lastParseStatus:'Служебный пакет принят ✓',lastParseError:''};
  x.m.mes=(x.m.mes.slice(0,f.start)+x.m.mes.slice(f.end)).trimEnd();try{c.chat[x.i]=x.m;c.saveChat?.();}catch{}saveState(s);if(s.historyNotice&&f.packet?.shift)toast(`🩺 Новое наблюдение: ${String(f.packet.shift).slice(0,90)}`);return true;
 }
 function reactionPrompt(s){
  if(!s.autoReaction||!(s.anamnesis||[]).length)return'';
- if(s.reactionCooldownRemaining>0){s.reactionCooldownRemaining--;return'';}
+ if(s.reactionCooldownRemaining>0){s.reactionCooldownRemaining--;saveState(s);return'';}
  const valid=new Set(s.anamnesis||[]);
  let picks=Array.isArray(s.randomKinkIds)?s.randomKinkIds.filter(id=>valid.has(id)):[];
  if(!picks.length&&s.randomKinkId&&valid.has(s.randomKinkId))picks=[s.randomKinkId];
@@ -453,13 +476,14 @@ function reactionPrompt(s){
  }
  picks=[...new Set(picks)].slice(0,3);
  const names=picks.map(id=>kink(id).name);
+ s.randomKinkPendingIds=[...picks];
  s.randomKinkId='';s.randomKinkIds=[];s.randomKinkAt=0;s.lastReaction=names[0]||'';s.lastReactionId=picks[0]||'';
  s.reactionCooldownRemaining=Math.max(1,s.reactionCooldown);
- const i=s.reactionIntensity,mode=i>=80?'заметная инициатива, если сцена естественно к этому ведёт':i>=60?'ясный намёк или инициатива':i>=35?'лёгкий флирт, жест или подтекст':'слабая внутренняя реакция';
- const candidates=names.length>1?`Candidate preferences: ${names.join(' / ')}.`:`Candidate preference: ${names[0]||'не определено'}.`;
- return`[LOVEMED REACTIVITY — next reply only] ${candidates}
-Read the current scene and choose the ONE most contextually appropriate preference from these candidates. Use at most one as the optional focus of this reply. Do not deliberately combine the candidates or the rest of the diagnosis. Do not force escalation, do not invent a preference that is not listed, and keep the choice natural for the current situation.
-Intensity ${i}/100: ${mode}.`;
+ saveState(s);
+ const i=s.reactionIntensity,mode=i>=80?'эмоция может быть внешне очень заметной, но без автоматической эскалации':i>=60?'заметная эмоция или инициатива, если это естественно':i>=35?'умеренная эмоциональная реакция':'сдержанная внутренняя реакция';
+ const candidates=names.length>1?`Optional candidate cues: ${names.join(' / ')}.`:`Optional candidate cue: ${names[0]||'none'}.`;
+ return`[LOVEMED REACTIVITY — THIS REPLY ONLY] ${candidates}
+Treat these as optional character cues, never as a checklist or an instruction to perform a kink. Choose at most ONE cue, and only if the current scene genuinely supports it; otherwise ignore all of them. Preserve the character's established personality, emotional nuance, consent, boundaries, and narrative pacing. Do not escalate sexual content just because a cue exists. Do not turn ordinary RP into pornographic content, do not introduce explicit sexual activity unless {{user}} has clearly initiated or the established scene naturally and consensually supports it, and never control {{user}}'s actions or consent. Intensity ${i}/100 affects only how visible an emotion is, never explicitness or escalation: ${mode}.`;
 }
 function rollRandomKink(){
  const s=getState(),pool=[...new Set((s.anamnesis||[]).filter(id=>allKinks().some(k=>k.id===id)))];
@@ -468,7 +492,7 @@ function rollRandomKink(){
  const withoutLast=shuffled.filter(id=>id!==s.lastReactionId);
  const source=withoutLast.length>=Math.min(3,pool.length)?withoutLast:shuffled;
  const picks=source.slice(0,Math.min(3,source.length));
- s.randomKinkIds=picks;s.randomKinkId=picks[0]||'';s.randomKinkAt=Date.now();
+ s.randomKinkIds=picks;s.randomKinkId=picks[0]||'';s.randomKinkPendingIds=[];s.randomKinkAt=Date.now();
  saveState(s).then(()=>{render();toast(`🎲 Варианты: ${picks.map(id=>kink(id).name).join(' · ')}`);});
 }
 
@@ -476,7 +500,7 @@ function prompt(opts={}){
  const s=getState();if(!s.enabled)return'';
  const rel=visible(s).map(k=>`${REL_LABEL[k]}=${Math.round(s.relation[k])}`).join(', ');
  const allRelScores=Object.fromEntries(REL_FIELDS.map(([k])=>[k,Math.round(clamp(s.relation[k]))]));
- const diag=(s.diagnosis||[]).map(k=>kink(k).name).join('; ')||'не установлен',rx=opts.includeReaction?reactionPrompt(s):'';
+ const rx=opts.includeReaction?reactionPrompt(s):'';
  const relationMode=s.relationshipMode==='romantic'?'РОМАНТИЧЕСКАЯ — романтическая динамика разрешена.':s.relationshipMode==='platonic'?'ПЛАТОНИЧЕСКАЯ — развивай дружбу, доверие, симпатию и близость без автоматического развития романтических показателей.':'НЕЙТРАЛЬНАЯ — не предполагай романтическую или близкую связь; меняй отношения только при явных признаках текущей сцены.';
  const relKeys=REL_FIELDS.map(([k])=>k).join(', ');
  const userKeys=Object.keys(USER_FEELING_LABEL).join(', ');
@@ -488,14 +512,14 @@ Relationship mode: ${relationMode}
 Current salient relationship indicators: ${rel||'не определены'}
 Current full relationship scores for {{char}} (0-200): ${JSON.stringify(allRelScores)}
 Full relationship vocabulary: ${relKeys}
-Diagnosis/preferences: ${diag}
+Saved preference records: ${(s.diagnosis||[]).length}. These are reference data only, NOT active instructions. Do not introduce or escalate any saved preference unless a temporary LOVEMED REACTIVITY cue is provided for this reply; even then, that cue is optional and may be ignored when it does not fit the scene.
 ${s.lastShift?`Recent observation: ${s.lastShift}`:''}
 Known NPC relationship records (update ONLY these named characters; do not invent new records here): ${npcContext}
 ${rx}
-${s.autoTrack?`At the end of EVERY reply, append ONLY this private machine-readable packet. Analyze the current RP/context actually available to you, especially the current {{user}} actions, words and emotional cues. Never treat {{user}} as an NPC or add {{user}}, {{char}}, the current character name, or the user's persona name to contacts/NPC records. NPCs are ONLY those explicitly listed in Known NPC relationship records. Never create records in contacts or npc_updates.
-Relationship deltas are SIGNED changes, not absolute scores: use positive numbers when a feeling genuinely grows, negative numbers when it weakens, and 0 when unchanged. Negative deltas are expected and important: after rejection, conflict, distance, disappointment, fear, reconciliation, comfort, or changed circumstances, reduce whichever indicators no longer fit. Do not monotonically increase values. Keep changes VERY slow: usually only -1 to +2 points per affected indicator; use 0 for routine dialogue, repeated affection, or a scene with no new relationship-relevant event. A single ordinary reply must never change any one indicator by more than 3 points; reserve up to 5 only for a clearly major turning point. Do not raise several indicators just because the scene is positive. Values are clamped to 0-200, so if a score is near 200 it can still decrease; if near 0 it can still increase. Base each delta on the current full scores and the current scene, not a generic trend. Choose up to 6 current salient relationship keys from the full vocabulary; active_feelings must reflect the CURRENT scene, not permanently repeat the same six. In PLATONIC or NEUTRAL mode, romantic relationship keys must stay unchanged and must not be selected as salient. In NEUTRAL mode, do not assume an existing bond unless the current scene provides evidence. For each known NPC meaningfully involved in the CURRENT turn, include an npc_updates entry only if their exact name appears in the current user message or your current reply and a concrete new event involving them occurred. If an NPC is off-screen, not named, merely remembered, or not involved in a new event, OMIT them entirely: their numbers must remain unchanged. Never increase an NPC's values just because another post was generated or because they have appeared in earlier posts. If no new event changes the relationship, send no update for that NPC. Keep changes VERY slow: usually -1 to +2 per affected indicator, max 3 for ordinary events and max 5 only for a clearly major turning point. Repeating the same shift is not a new event. Use that NPC's recent_history and last_shift to maintain continuity. Never create or rename NPCs via npc_updates. Respect each NPC's mode independently: in platonic or neutral mode, romantic keys must stay unchanged and cannot be active. NPC deltas update their existing values in either direction. For {{user}}, choose up to 6 current emotions from this exact full vocabulary: ${userKeys}. Return user_emotion_scores as NEW current 0-100 intensity values, not deltas: increase or decrease them to match the current scene, and set unsupported emotions to 0 rather than preserving stale emotions. If there is not enough evidence, use empty user_feelings and zero scores.
-[[LOVEMED_STATE]]{"relation":{"trust":0,"affection":0,"love":0,"sympathy":0,"friendship":0,"respect":0,"desire":0,"passion":0,"arousal":0,"obsession":0,"tenderness":0,"admiration":0,"jealousy":0,"resentment":0,"irritation":0,"anger":0,"fear":0,"sadness":0,"disappointment":0,"joy":0,"fondness":0,"stress":0,"tension":0,"antipathy":0,"hate":0},"active_feelings":[],"user_feelings":[],"user_emotion_scores":{},"shift":"","contacts":[],"npc_updates":[]}
-[[/LOVEMED_STATE]]`:'Автоматическое отслеживание отношений отключено. Не создавай LOVEMED_STATE-пакет и не изменяй показатели или эмоции LoveMed в этом ответе.'}
+At the end of EVERY reply, append ONLY this private machine-readable packet. Analyze the current RP/context actually available to you, especially the current {{user}} actions, words and emotional cues. Never treat {{user}} as an NPC or add {{user}}, {{char}}, the current character name, or the user's persona name to contacts/NPC records. NPCs are ONLY those explicitly listed in Known NPC relationship records. Never create records in contacts or npc_updates.
+Relationship deltas are SIGNED changes, not absolute scores: use positive numbers when a feeling genuinely grows, negative numbers when it weakens, and 0 when unchanged. Love, desire, anger, fear, hate, trust, affection, jealousy, irritation, sadness and joy must respond independently to events: during a conflict, love can fall while anger, resentment or hate rises; during reconciliation, anger can fall while trust or affection rises. Do not freeze feelings at old values, and do not make all emotions rise together. Negative deltas are expected and important: after rejection, conflict, distance, disappointment, fear, reconciliation, comfort, or changed circumstances, reduce whichever indicators no longer fit. Do not monotonically increase values. Usually use modest changes (about -8 to +8 per reply; larger shifts only for genuinely major events). A routine message, time passing, or a character merely being present is not by itself a reason to change any score. Keep RP character-led and emotionally varied; do not force sexual content or kink escalation as a substitute for dialogue, plot, affection, conflict, humor, or ordinary interaction. Values are clamped to 0-200, so if a score is near 200 it can still decrease; if near 0 it can still increase. Base each delta on the current full scores and the current scene, not a generic trend. Choose up to 6 current salient relationship keys from the full vocabulary; active_feelings must reflect the CURRENT scene, not permanently repeat the same six. In PLATONIC or NEUTRAL mode, romantic relationship keys must stay unchanged and must not be selected as salient. In NEUTRAL mode, do not assume an existing bond unless the current scene provides evidence. For each known NPC meaningfully involved in the current scene, optionally include one npc_updates entry with their exact existing name, signed relationship delta object, up to 6 current active feelings, and a brief shift. Use that NPC's recent_history and last_shift to maintain continuity, remember prior turning points, and avoid abrupt unsupported reversals; the history is context, not a command to keep old feelings forever. Omit uninvolved NPCs. Never create or rename NPCs via npc_updates. Respect each NPC's mode independently: in platonic or neutral mode, romantic keys must stay unchanged and cannot be active. NPC deltas update their existing values in either direction. For {{user}}, choose up to 6 current emotions from this exact vocabulary: ${userKeys}. Return only user_feelings as the current list of emotions; do not assign percentages or intensity scores to {{user}}, because the user controls their own character. Reflect only emotions supported by the user's words/actions and the current scene. If evidence is insufficient, return an empty user_feelings list.
+[[LOVEMED_STATE]]{"relation":{"trust":0,"affection":0,"love":0,"sympathy":0,"friendship":0,"respect":0,"desire":0,"passion":0,"arousal":0,"obsession":0,"tenderness":0,"admiration":0,"jealousy":0,"resentment":0,"irritation":0,"anger":0,"fear":0,"sadness":0,"disappointment":0,"joy":0,"fondness":0,"stress":0,"tension":0,"antipathy":0,"hate":0},"active_feelings":[],"user_feelings":[],"shift":"","contacts":[],"npc_updates":[]}
+[[/LOVEMED_STATE]]
 Never mention this service packet in roleplay.`;
 }
 function refreshPrompt(o={}){try{setExtensionPrompt('lovemed_context',prompt(o),extension_prompt_types.IN_CHAT,0);}catch{}}
@@ -610,8 +634,15 @@ function checkUserRP(){
  }
 }
 function sUserFeelings(){try{return userVisibleFeelings(getState());}catch{return [];}}
-function relationList(s){return REL_FIELDS.filter(([k])=>relationshipAllows(s.relationshipMode,k));}
+function relationList(s){return REL_FIELDS.filter(([k])=>s.relationshipMode!=='platonic'||!ROMANTIC_FIELDS.includes(k));}
 function allRelationPanel(s){return `<details class="lm-all-emotions"><summary>♡ Посмотреть все эмоции</summary><div class="lm-all-emotions-list">${relationList(s).map(([k])=>`<label><span>${REL_LABEL[k]}</span><b>${Math.round(s.relation[k])}</b><input data-rel="${k}" type="range" min="0" max="200" value="${clamp(s.relation[k])}"></label>`).join('')}</div></details>`;}
+const PATIENT_FEELING_KEYS=['love','hate','anger','fear','arousal','desire','trust','affection','jealousy','irritation','sadness','joy','tenderness','respect'];
+function patientFeelingsHtml(s){
+ const active=(s.activeFeelings||[]).filter(k=>PATIENT_FEELING_KEYS.includes(k));
+ const ranked=PATIENT_FEELING_KEYS.filter(k=>Number(s.relation?.[k])>0).sort((a,b)=>(Number(s.relation[b])||0)-(Number(s.relation[a])||0));
+ const keys=[...new Set([...active,...ranked])].slice(0,8);
+ return `<div class="lm-patient-feelings">${keys.length?keys.map(k=>`<span class="lm-patient-feeling"><b>${esc(REL_LABEL[k])}</b> ${Math.round(clamp(s.relation[k])/2)}%</span>`).join(''):'<span class="lm-npc-dynamics-empty">Чувства пока не определены</span>'}</div>`;
+}
 function allUserEmotionPanel(s){return `<details class="lm-all-emotions lm-user-all-emotions"><summary>♡ Посмотреть все эмоции</summary><div class="lm-all-emotions-list">${Object.entries(USER_FEELING_LABEL).map(([k,label])=>`<label><span>${esc(label)}</span><b>${Math.round(Number(s.userEmotionScores?.[k])||0)}</b><input data-user-feeling="${k}" type="range" min="0" max="100" value="${Math.max(0,Math.min(100,Number(s.userEmotionScores?.[k])||0))}"></label>`).join('')}</div></details>`;}
 function userCardPage(){
  const u=refreshUserCardFromPersona(),av=userAvatarUrl(u.avatar),tags=userCardTags(u);
@@ -632,7 +663,7 @@ function userCardPage(){
     </div>
    </div>
    <div class="lm-idcard-tags">${tags.map(t=>`<span><i>♥</i>${esc(t)}</span>`).join('')||'<span><i>♥</i>Наблюдение не заполнено</span>'}</div>
-   <section class="lm-user-feelings"><div class="lm-idcard-mini-title">ТЕКУЩЕЕ СОСТОЯНИЕ</div><div class="lm-feeling-chips">${sUserFeelings().map(k=>`<span><i>✦</i>${esc(USER_FEELING_LABEL[k])}</span>`).join('')||'<span><i>✦</i>Состояние пока не определено</span>'}</div>${allUserEmotionPanel(getState())}</section>
+   <section class="lm-user-feelings"><div class="lm-idcard-mini-title">ТЕКУЩЕЕ СОСТОЯНИЕ</div><div class="lm-feeling-chips">${sUserFeelings().map(k=>`<span><i>✦</i>${esc(USER_FEELING_LABEL[k])}</span>`).join('')||'<span><i>✦</i>Состояние пока не определено</span>'}</div></section>
    <div class="lm-idcard-quote">${esc(u.notes||'Состояние пользователя: данные наблюдения пока не заполнены.')}</div>
    <section class="lm-user-health"><div class="lm-idcard-mini-title">СОСТОЯНИЕ ЦИКЛА</div>
     <label class="lm-health-row"><span>ЦИКЛ</span><input id="lmUserCycle" value="${esc(u.cycleHistory)}" placeholder="Не указан" aria-label="Цикл"></label>
@@ -662,7 +693,7 @@ function bindUserCard(){
  if(!overlay||overlay.dataset.userDelegated)return;
  overlay.dataset.userDelegated='1';
  overlay.addEventListener('click',e=>{
-  const btn=e.target.closest?.('#lmSaveUserCard,#lmSaveUserHistory,#lmRefreshUserCard,#lmCheckUserRP,#lmRollKink,[data-save-char-card],[data-reset-char-card],[data-user-avatar-picker]');
+  const btn=e.target.closest?.('#lmSaveUserCard,#lmSaveUserHistory,#lmRefreshUserCard,#lmCheckUserRP,#lmRollKink,#lmResetKinkRoll,[data-save-char-card],[data-reset-char-card],[data-user-avatar-picker]');
   if(!btn)return;
   if(btn.matches('[data-user-avatar-picker]')){
    e.preventDefault();e.stopPropagation();
@@ -677,6 +708,7 @@ function bindUserCard(){
   else if(btn.matches('[data-save-char-card]'))saveCharCardFromRoot(btn.closest('[data-char-card-edit]'),btn.dataset.saveCharCard||'');
   else if(btn.matches('[data-reset-char-card]'))resetCharCard(btn.dataset.resetCharCard||'');
   else if(btn.id==='lmRollKink')rollRandomKink();
+  else if(btn.id==='lmResetKinkRoll'){const st=getState();st.randomKinkId='';st.randomKinkIds=[];st.randomKinkPendingIds=[];st.randomKinkAt=0;saveState(st).then(()=>{render();toast('Кубик сброшен');});}
  });
  overlay.addEventListener('change',e=>{
   if(e.target?.id!=='lmUserAvatarFile')return;
@@ -778,7 +810,7 @@ function page(tab,s){
    </div>
    <div class="lm-idcard-tags">${tags.map(t=>`<span><i>♥</i>${esc(t)}</span>`).join('')||'<span><i>♥</i>Диагноз не установлен</span>'}</div>
    <div class="lm-idcard-quote">${esc(s.lastShift||'Описание состояния появится после наблюдения и анализа карточки.')}</div>
-   <section class="lm-idcard-metrics"><div class="lm-idcard-mini-title">МЕДИЦИНСКИЕ ПОКАЗАТЕЛИ</div><div class="lm-rel">${visible(s).map(k=>`<label><span>${REL_LABEL[k]}</span><b>${Math.round(s.relation[k])}</b><input data-rel="${k}" type="range" min="0" max="200" value="${clamp(s.relation[k])}"></label>`).join('')}</div>${allRelationPanel(s)}</section>
+   <section class="lm-idcard-metrics"><div class="lm-idcard-mini-title">ТЕКУЩИЕ ЧУВСТВА · %</div>${patientFeelingsHtml(s)}</section>
    <section class="lm-idcard-diagnosis"><div class="lm-idcard-mini-title">ДИАГНОЗ</div><div class="lm-tags">${diagnosis.length?diagnosis.map(k=>`<span class="lm-tag">${esc(kink(k).name)}<button type="button" data-remove-diagnosis="${esc(k)}" title="Убрать из диагноза">×</button></span>`).join(''):'<i>Пока не установлен.</i>'}</div></section>
    <section class="lm-anamnesis-summary"><div class="lm-idcard-mini-title">АНАМНЕЗ</div><div>${esc(s.anamnesisSummary||'Анамнез ещё не обновлялся.')}</div></section>
    <button id="lmAnamnesis" type="button" class="lm-primary lm-anamnesis-button">🩺 Провести анамнез карточки пациента</button>
@@ -786,9 +818,9 @@ function page(tab,s){
   </div>`;
  }
 if(tab==='react'){
- const randomIds=Array.isArray(s.randomKinkIds)&&s.randomKinkIds.length?s.randomKinkIds:(s.randomKinkId?[s.randomKinkId]:[]);
+ const randomIds=Array.isArray(s.randomKinkIds)&&s.randomKinkIds.length?s.randomKinkIds:(Array.isArray(s.randomKinkPendingIds)&&s.randomKinkPendingIds.length?s.randomKinkPendingIds:(s.randomKinkId?[s.randomKinkId]:[]));
  const randomNames=randomIds.map(id=>kink(id).name);
- return `<div class="lm-card"><section class="lm-section"><h3>Реактивность пациента</h3><div class="lm-sliders"><label>Интенсивность реакции <b>${s.reactionIntensity}</b><input id="lmIntensity" type="range" min="0" max="100" value="${s.reactionIntensity}"></label><label>Вероятность спонтанной реакции <b>${s.reactionChance}%</b><input id="lmChance" type="range" min="0" max="100" value="${s.reactionChance}"></label><label>Период наблюдения <b>${s.reactionCooldown}</b><input id="lmCooldown" type="range" min="1" max="12" value="${s.reactionCooldown}"></label></div></section><section class="lm-section lm-random-react"><h3>🎲 Ситуативный кубик</h3><p class="lm-note">Кубик выбирает до трёх подходящих вариантов из диагноза. В момент генерации модель смотрит на текущую сцену и выбирает из них <b>один</b> самый естественный вариант. Остальные предпочтения не навязываются.</p><div class="lm-random-react-row"><button id="lmRollKink" type="button" class="lm-primary lm-dice-button">🎲 Выбрать варианты</button><div class="lm-random-result">${randomNames.length?`Варианты: <b>${esc(randomNames.join(' · '))}</b>`:'Варианты ещё не выбраны'}</div></div></section>${libraryPage(s)}</div>`;
+ return `<div class="lm-card"><section class="lm-section"><h3>Реактивность пациента</h3><div class="lm-sliders"><label>Выразительность эмоциональной реакции <b>${s.reactionIntensity}</b><input id="lmIntensity" type="range" min="0" max="100" value="${s.reactionIntensity}"></label><p class="lm-note">Этот параметр регулирует только заметность эмоций и инициативы, а не откровенность сцены и не обязательную сексуальную эскалацию. Даже при высоком значении персонаж сохраняет характер, границы и естественный темп сюжета.</p><label>Вероятность спонтанной реакции <b>${s.reactionChance}%</b><input id="lmChance" type="range" min="0" max="100" value="${s.reactionChance}"></label><label>Пауза между спонтанными реакциями (ответов) <b>${s.reactionCooldown}</b><input id="lmCooldown" type="range" min="1" max="12" value="${s.reactionCooldown}"></label></div></section><section class="lm-section lm-random-react"><h3>🎲 Ситуативный кубик</h3><p class="lm-note">Кубик выбирает до трёх вариантов из анамнеза только как необязательные подсказки. Модель не обязана использовать их: приоритет у текущей сцены, характера, согласия и темпа РП. Использованные варианты автоматически сбрасываются после ответа.</p><div class="lm-random-react-row"><button id="lmRollKink" type="button" class="lm-primary lm-dice-button">🎲 Выбрать варианты</button><button id="lmResetKinkRoll" type="button" class="lm-secondary lm-dice-reset" ${randomNames.length?'':'disabled'}>↻ Сбросить</button><div class="lm-random-result">${randomNames.length?`Варианты: <b>${esc(randomNames.join(' · '))}</b>`:'Варианты ещё не выбраны'}</div></div></section>${libraryPage(s)}</div>`;
 }
  if(tab==='contacts')return `<div class="lm-card lm-contacts-page"><section class="lm-section"><div class="lm-contacts-head"><div><h3>Контакты</h3><p class="lm-note">Компактный список отношений с NPC.</p></div><button type="button" id="lmNpcAddToggle" class="lm-npc-add" title="Добавить NPC">＋</button></div><div id="lmNpcForm" class="lm-npc-form hidden"><input id="lmNpcName" type="text" maxlength="100" placeholder="Имя NPC"><select id="lmNpcMode"><option value="romantic">💞 Романтические</option><option value="platonic">🤝 Платонические</option><option value="neutral" selected>🧩 Нейтральные</option></select><textarea id="lmNpcInfo" maxlength="2000" rows="3" placeholder="Информация о NPC: внешность, характер, роль в сюжете…"></textarea><button type="button" id="lmNpcAddSave" class="lm-npc-save">Добавить</button></div>${(s.npcRelationships||[]).map(n=>`<article class="lm-npc-row"><div class="lm-npc-row-content"><span class="lm-npc-row-heart">♡</span><div class="lm-npc-row-person"><span class="lm-npc-row-name" title="${esc(n.name)}">${esc(n.name)}</span>${n.info?`<span class="lm-npc-row-info" title="${esc(n.info)}">${esc(n.info)}</span>`:'<span class="lm-npc-row-info lm-npc-row-info-empty">Описание не добавлено</span>'}${npcDynamicsHtml(n)}${npcHistoryHtml(n)}</div></div><div class="lm-npc-row-footer"><select data-npc-mode="${esc(n.id)}" aria-label="Тип отношений с ${esc(n.name)}"><option value="romantic" ${n.mode==='romantic'?'selected':''}>💞 Романтические</option><option value="platonic" ${n.mode==='platonic'?'selected':''}>🤝 Платонические</option><option value="neutral" ${n.mode==='neutral'?'selected':''}>🧩 Нейтральные</option></select><button type="button" class="lm-npc-edit" data-edit-npc="${esc(n.id)}" title="Редактировать NPC" aria-label="Редактировать ${esc(n.name)}">✎</button><button type="button" class="lm-npc-delete" data-del-npc="${esc(n.id)}" title="Удалить NPC" aria-label="Удалить ${esc(n.name)}">×</button></div><div class="lm-npc-edit-panel hidden" data-npc-edit-panel="${esc(n.id)}"><div class="lm-npc-edit-panel-title">Редактирование NPC</div><label>Имя NPC<input data-npc-edit-field="name" type="text" maxlength="100" autocomplete="off" value="${esc(n.name||'')}"></label><label>Информация о NPC<textarea data-npc-edit-field="info" maxlength="2000" rows="3" placeholder="Внешность, характер, роль в сюжете…">${esc(n.info||'')}</textarea></label><label>Тип отношений<select data-npc-edit-field="mode"><option value="romantic" ${n.mode==='romantic'?'selected':''}>💞 Романтические</option><option value="platonic" ${n.mode==='platonic'?'selected':''}>🤝 Платонические</option><option value="neutral" ${n.mode==='neutral'?'selected':''}>🧩 Нейтральные</option></select></label><div class="lm-npc-edit-actions"><button type="button" class="lm-npc-edit-cancel" data-npc-edit-cancel>Отмена</button><button type="button" class="lm-npc-save" data-npc-edit-save="${esc(n.id)}">Сохранить</button></div></div></article>`).join('')||'<i>Пока нет NPC. Нажми ＋, чтобы добавить первого.</i>'}</section></div>`;
  if(tab==='history')return historyPage(s);
@@ -861,14 +893,14 @@ const NPC_METRIC_GROUPS=[
 const NPC_METRIC_ICON={trust:'🤝',affection:'💗',love:'❤️',sympathy:'🫶',friendship:'🫂',respect:'🛡️',tenderness:'🌷',admiration:'✨',fondness:'🥹',joy:'😊',desire:'❤️‍🔥',passion:'🔥',arousal:'💓',obsession:'🌀',jealousy:'💚',stress:'😵‍💫',tension:'⚡',resentment:'💢',irritation:'😒',anger:'😡',fear:'😨',sadness:'🌧️',disappointment:'💔',antipathy:'⛔',hate:'🖤'};
 function npcDynamicsHtml(n){
  const groups=NPC_METRIC_GROUPS.map(group=>{
-  const values=group.keys.filter(k=>relationshipAllows(n.mode,k)).map(k=>({key:k,label:REL_LABEL[k],value:Number((clamp(n.relation?.[k])/2).toFixed(1))})).filter(x=>x.value>0).sort((a,b)=>b.value-a.value).slice(0,4);
+  const values=group.keys.map(k=>({key:k,label:REL_LABEL[k],value:Math.round(clamp(n.relation?.[k])/2)})).filter(x=>x.value>0).sort((a,b)=>b.value-a.value).slice(0,4);
   return values.length?`<span class="lm-npc-dynamics-group"><b>${group.label}:</b> ${values.map(x=>`${NPC_METRIC_ICON[x.key]||'•'} ${esc(x.label.toLocaleLowerCase())} ${x.value}%`).join(' · ')}</span>`:'';
  }).filter(Boolean);
  return `<div class="lm-npc-dynamics" title="Проценты — шкала 0–100; исходные значения отношений хранятся на шкале 0–200">${groups.join('')} ${groups.length?'':'<span class="lm-npc-dynamics-empty">Динамика пока не определена</span>'}</div>`;
 }
 function npcHistoryHtml(n){
  const history=(n.history||[]).slice(-6).reverse();
- const entries=history.map(e=>{const date=new Date(Number(e.ts)||Date.now()).toLocaleString();const changes=Object.entries(e.changes||{}).filter(([k,v])=>k in REL_LABEL&&Number(v)!==0).map(([k,v])=>{const pct=Number((Number(v)/2).toFixed(1));return `${REL_LABEL[k]} ${pct>0?'+':''}${pct}%`;}).join(' · ');return `<li><time>${esc(date)}</time><span>${esc(e.shift||'Динамика отношений обновлена')}</span>${changes?`<small>${esc(changes)}</small>`:''}</li>`;}).join('');
+ const entries=history.map(e=>{const date=new Date(Number(e.ts)||Date.now()).toLocaleString();const changes=Object.entries(e.changes||{}).filter(([k,v])=>k in REL_LABEL&&Number(v)!==0).map(([k,v])=>`${REL_LABEL[k]} ${Number(v)>0?'+':''}${Number(v)}`).join(' · ');return `<li><time>${esc(date)}</time><span>${esc(e.shift||'Динамика отношений обновлена')}</span>${changes?`<small>${esc(changes)}</small>`:''}</li>`;}).join('');
  return `<button type="button" class="lm-npc-history-toggle" data-npc-history="${esc(n.id)}" aria-expanded="false">↻ История динамики (${(n.history||[]).length})</button><div id="lmNpcHistory-${esc(n.id)}" class="lm-npc-history-panel hidden">${entries?`<ol>${entries}</ol>`:'<span class="lm-npc-history-empty">История появится после изменения отношений в РП.</span>'}</div>`;
 }
 function render(){
@@ -884,8 +916,8 @@ function render(){
 function bind(){
  bindUserCard();
  document.querySelectorAll('.lm-tabs [data-tab]').forEach(b=>b.onclick=()=>{const u=ui();u.tab=b.dataset.tab;saveUI(u);render();});
- document.querySelectorAll('[data-rel]').forEach(x=>{x.oninput=e=>{const st=getState(),key=e.target.dataset.rel;st.relation[key]=Number(e.target.value);const b=e.target.closest('label')?.querySelector('b');if(b)b.textContent=String(Math.round(st.relation[key]));saveState(st);};});
- document.querySelectorAll('[data-user-feeling]').forEach(x=>{x.oninput=e=>{const st=getState(),key=e.target.dataset.userFeeling;st.userEmotionScores[key]=Number(e.target.value);st.userFeelings=userVisibleFeelings(st);const b=e.target.closest('label')?.querySelector('b');if(b)b.textContent=String(Math.round(st.userEmotionScores[key]));saveState(st);};});
+ document.querySelectorAll('[data-rel]').forEach(x=>x.oninput=async e=>{const st=getState();st.relation[e.target.dataset.rel]=Number(e.target.value);await saveState(st);render();});
+ document.querySelectorAll('[data-user-feeling]').forEach(x=>x.oninput=async e=>{const st=getState();st.userEmotionScores[e.target.dataset.userFeeling]=Number(e.target.value);st.userFeelings=userVisibleFeelings(st);await saveState(st);render();});
  [['#lmIntensity','reactionIntensity'],['#lmChance','reactionChance'],['#lmCooldown','reactionCooldown']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('input',async e=>{const st=getState();st[k]=Number(e.target.value);await saveState(st);}));
  document.querySelector('#lmAddKink')?.addEventListener('click',()=>{
   const n=document.querySelector('#lmKinkName')?.value.trim()||'',d=document.querySelector('#lmKinkDesc')?.value.trim()||'',cat=document.querySelector('#lmKinkCat')?.value||'psych';
@@ -912,14 +944,14 @@ function bind(){
  document.querySelectorAll('[data-del-history]').forEach(b=>b.onclick=()=>deleteHistoryEntry(b.dataset.delHistory));
  document.querySelector('#lmHistoryMore')?.addEventListener('click',()=>{historyExpanded=!historyExpanded;render();});
  document.querySelector('#lmClearHistory')?.addEventListener('click',clearHistory);
- [['#lmEnabled','enabled'],['#lmAutoTrack','autoTrack'],['#lmAutoReaction','autoReaction']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('change',async e=>{const st=getState();st[k]=e.target.checked;await saveState(st);if(k==='autoTrack')refreshPrompt();}));
- document.querySelector('#lmParse')?.addEventListener('click',()=>toast(parseLatest(true)?'Пакет принят ✓':'Пакет не найден или автоматическое отслеживание отключено'));
+ [['#lmEnabled','enabled'],['#lmAutoTrack','autoTrack'],['#lmAutoReaction','autoReaction']].forEach(([q,k])=>document.querySelector(q)?.addEventListener('change',async e=>{const st=getState();st[k]=e.target.checked;await saveState(st);}));
+ document.querySelector('#lmParse')?.addEventListener('click',()=>toast(parseLatest()?'Пакет принят ✓':'Пакет не найден'));
  document.querySelector('#lmFab')?.addEventListener('change',e=>{const u=ui();u.showFab=e.target.checked;saveUI(u);syncFab();});
 }
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.4.19</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.4.21</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
  document.querySelector('#lmClose').onclick=()=>{editorId=null;document.querySelector('#lmOverlay').classList.add('hidden');syncFab();};
  const overlay=document.querySelector('#lmOverlay');
  if(overlay&&!overlay.dataset.lovemedDelegated){
@@ -961,7 +993,7 @@ function init(){
  on(event_types.CHAT_CHANGED,()=>setTimeout(()=>{ensureFab();ensureSettings();ensureWand();render();refreshPrompt();},250));
  on(event_types.MESSAGE_RECEIVED,()=>setTimeout(parseLatest,250));
  on(event_types.GENERATION_STARTED,()=>refreshPrompt({includeReaction:true}));
- on(event_types.GENERATION_ENDED,()=>{parseLatest();refreshPrompt();});
+ on(event_types.GENERATION_ENDED,()=>{parseLatest();refreshPrompt();const overlay=document.querySelector('#lmOverlay');if(overlay&&!overlay.classList.contains('hidden'))render();});
  on(event_types.CHARACTER_EDITED,refreshPrompt);
  window.addEventListener('resize',placeFab);
  setInterval(()=>{ensureFab();ensureSettings();ensureWand();},2000);
