@@ -666,10 +666,10 @@
 .lm-dice-reset:disabled{opacity:.45;cursor:not-allowed}
 
 
-/* LoveMed v0.4.22 — luminous clinical-heart emblem with low-distraction idle state. */
+/* LoveMed v0.4.23 — preserve inline display toggling so the FAB hides behind the open panel. */
 .lm-fab{
  width:46px!important;height:46px!important;
- display:grid!important;place-items:center!important;
+ place-items:center!important;
  padding:0!important;overflow:visible!important;
  border:1px solid rgba(130,245,239,.58)!important;
  border-radius:17px 17px 17px 7px!important;
