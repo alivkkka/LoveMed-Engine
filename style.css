@@ -664,3 +664,32 @@
 .lm-patient-feeling{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;background:rgba(33,156,201,.13);border:1px solid rgba(93,215,244,.25);font-size:11px;line-height:1.2;color:var(--lm-text,#d9eeee)}
 .lm-patient-feeling b{color:var(--lm-accent,#63e7dc);font-weight:700}
 .lm-dice-reset:disabled{opacity:.45;cursor:not-allowed}
+
+
+/* LoveMed v0.4.22 — luminous clinical-heart emblem with low-distraction idle state. */
+.lm-fab{
+ width:46px!important;height:46px!important;
+ display:grid!important;place-items:center!important;
+ padding:0!important;overflow:visible!important;
+ border:1px solid rgba(130,245,239,.58)!important;
+ border-radius:17px 17px 17px 7px!important;
+ background:linear-gradient(145deg,rgba(10,37,43,.97),rgba(72,22,47,.97))!important;
+ color:#eafffd!important;
+ box-shadow:0 0 0 1px rgba(226,189,99,.10),0 4px 18px rgba(0,0,0,.42),0 0 15px rgba(69,238,228,.13)!important;
+ opacity:1;transform:translateZ(0) scale(1);
+ transition:opacity .65s ease,filter .65s ease,transform .65s ease,box-shadow .65s ease,border-color .65s ease!important;
+ cursor:grab;
+}
+.lm-fab .lm-fab-mark{width:31px!important;height:31px!important;display:block;filter:drop-shadow(0 1px 4px rgba(101,217,230,.20));transition:transform .35s ease,filter .35s ease}
+.lm-fab .lm-fab-heart{transform-origin:center;transition:filter .35s ease}
+.lm-fab:hover,.lm-fab:focus-visible,.lm-fab:active{
+ opacity:1!important;filter:none!important;transform:scale(1.06)!important;
+ border-color:rgba(166,255,247,.9)!important;
+ box-shadow:0 0 0 1px rgba(226,189,99,.16),0 5px 22px rgba(0,0,0,.48),0 0 22px rgba(69,238,228,.28)!important;
+ outline:none;
+}
+.lm-fab:hover .lm-fab-mark,.lm-fab:focus-visible .lm-fab-mark{transform:rotate(-4deg) scale(1.04);filter:drop-shadow(0 0 5px rgba(166,255,247,.42))}
+.lm-fab.lm-fab-idle{opacity:.13!important;filter:saturate(.55)!important;box-shadow:0 2px 8px rgba(0,0,0,.18)!important;border-color:rgba(130,245,239,.18)!important}
+.lm-fab.lm-fab-idle .lm-fab-mark{filter:drop-shadow(0 0 2px rgba(101,217,230,.12))}
+@media(prefers-reduced-motion:reduce){.lm-fab,.lm-fab .lm-fab-mark{transition:none!important}}
+@media(max-width:600px){.lm-fab{width:43px!important;height:43px!important;border-radius:15px 15px 15px 6px!important}.lm-fab .lm-fab-mark{width:29px!important;height:29px!important}}
