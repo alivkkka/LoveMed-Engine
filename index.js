@@ -318,13 +318,42 @@ function charProfile(){
  return {name:manual.name||(ch?.name||ch?.data?.name)||'{{char}}',age:manual.age||fields.age,sex:manual.sex||fields.sex,gender:manual.gender||fields.gender,secondarySex:manual.secondarySex||fields.secondarySex,avatar:a?`/characters/${encodeURIComponent(a)}`:'',memberKey:ch?charMemberKey(ch):''};
 }
 
+function preferenceText(){
+ const ch=charObject();if(!ch)return'';
+ const chunks=[],seen=new WeakSet();
+ const preferenceKey=/^(?:kinks?|fetishes?|kink[_ -]?preferences?|fetish[_ -]?preferences?|sexual[_ -]?preferences?|preferences)$/i;
+ function walk(value,key='',depth=0){
+  if(depth>8||value==null)return;
+  if(typeof value==='string'){
+   if(preferenceKey.test(key)&&value.trim())chunks.push(value.trim());
+   return;
+  }
+  if(typeof value!=='object'||seen.has(value))return;seen.add(value);
+  if(Array.isArray(value)){value.slice(0,250).forEach(item=>walk(item,key,depth+1));return;}
+  for(const [childKey,childValue] of Object.entries(value))walk(childValue,childKey,depth+1);
+ }
+ walk(ch,'character');
+ // Character cards commonly store everything in a long description. In that case,
+ // accept only explicitly labelled preference sections, never arbitrary mentions elsewhere.
+ const lines=cardText().split(/\r?\n/),labels=/^(?:[-*•#> ]*)?(?:kinks?|fetishes?|kink preferences?|fetish preferences?|sexual preferences?|intimate preferences?|preferences)\s*[:：=–—-]?\s*(.*)$/i;
+ const boundary=/^(?:[-*•#> ]*)?(?:name|age|gender|sex|appearance|personality|character|personality traits|scenario|background|backstory|occupation|likes|dislikes|limits|boundaries|hard limits|soft limits|description|relationships|relationships?|speech|speech style|notes|example dialogue|first message|greeting|биография|внешность|характер|сценарий|возраст|имя|предпочтения пользователя|ограничения|границы|не любит|любит)\s*[:：=–—-]/i;
+ let collecting=false;
+ for(const rawLine of lines){
+  const line=rawLine.trim();if(!line)continue;
+  const match=line.match(labels);
+  if(match){collecting=true;if(match[1])chunks.push(match[1]);continue;}
+  if(collecting&&boundary.test(line)){collecting=false;continue;}
+  if(collecting)chunks.push(line);
+ }
+ return [...new Set(chunks)].join('\n');
+}
 function scan(){
- const t=cardText();
- if(!t)return[];
- const low=t.toLowerCase();
+ const source=preferenceText();
+ if(!source.trim())return[];
+ const low=normalizeCueText(source);
  return [...new Set(allKinks().filter(k=>{
-  const terms=[k.name,...(k.words||[])].filter(Boolean).map(String);
-  return terms.some(w=>w.length>1&&low.includes(w.toLowerCase()));
+  const terms=[k.name,...(k.words||[])].filter(Boolean).map(normalizeCueText).filter(w=>w.length>1);
+  return terms.some(w=>low.includes(w));
  }).map(k=>k.id))];
 }
 function kink(id){return allKinks().find(k=>k.id===id)||baseKink(id)||{id,name:id,cat:'psych',description:'',words:[]};}
@@ -510,8 +539,10 @@ function reactionPrompt(s){
 Treat these as optional character cues, never as a checklist or an instruction to perform a kink. Choose at most ONE cue, and only if the current scene genuinely supports it; otherwise ignore all of them. Preserve the character's established personality, emotional nuance, consent, boundaries, and narrative pacing. Do not escalate sexual content just because a cue exists. Do not escalate sexual content solely because a cue exists. However, the separate CHARACTER INITIATIVE SETTING in the main LoveMed instructions means {{char}} may initiate flirtation, closeness, a kiss, or a consensual intimate development when character, relationship mode, and scene naturally support it; {{user}} does not have to make every first move. Never control {{user}}'s actions or consent. Intensity ${i}/100 affects only how visible an emotion is, never explicitness or escalation: ${mode}.`;
 }
 function rollRandomKink(){
- const s=getState(),pool=[...new Set((s.anamnesis||[]).filter(id=>allKinks().some(k=>k.id===id)))];
- if(!pool.length){toast('Сначала проведите анамнез и получите хотя бы один реактив.');return;}
+ const s=getState(),pool=[...new Set(scan().filter(id=>allKinks().some(k=>k.id===id)))];
+ if(!pool.length){toast('В предпочтениях карточки {{char}} не найдено ни одного реактива. Проверьте раздел «Kinks / Fetishes / Preferences» и обновите анамнез.');return;}
+ // Refresh the stored pool before rolling so stale results from the old whole-card scan cannot leak in.
+ s.anamnesis=pool;s.diagnosis=diagnosisFor(s,pool);
  const shuffled=[...pool].sort(()=>Math.random()-0.5);
  const withoutLast=shuffled.filter(id=>id!==s.lastReactionId);
  const source=withoutLast.length>=Math.min(3,pool.length)?withoutLast:shuffled;
