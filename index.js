@@ -58,7 +58,7 @@ intensity:'Эмоции персонажа могут быть заметнее 
 
 const CAT_LABEL={psych:'Психологические',physical:'Физические / сенсорные',situational:'Ситуационные',romantic:'Романтические'};
 
-const defaults=()=>({enabled:true,autoTrack:true,autoReaction:true,relationshipMode:'romantic',npcRelationships:[],relation:Object.fromEntries(REL_FIELDS.map(([k])=>[k,0])),activeFeelings:[],lastShift:'',diagnosis:[],diagnosisManual:{added:[],removed:[]},anamnesis:[],anamnesisAt:0,reactionIntensity:55,reactionChance:35,reactionCooldown:4,initiative:80,reactionCooldownRemaining:0,lastReaction:'',lastReactionId:'',randomKinkId:'',randomKinkIds:[],randomKinkPendingIds:[],randomKinkAt:0,contacts:[],history:[],historyNotice:true,anamnesisSummary:'',userFeelings:[],userEmotionScores:{...USER_FEELING_DEFAULTS},charName:'',updatedAt:Date.now(),diagnostics:{lastParseAt:0,lastParseStatus:'Ожидает проверки',lastParseError:''}});
+const defaults=()=>({enabled:true,autoTrack:true,autoReaction:true,relationshipMode:'romantic',npcRelationships:[],relation:Object.fromEntries(REL_FIELDS.map(([k])=>[k,0])),activeFeelings:[],lastShift:'',diagnosis:[],diagnosisManual:{added:[],removed:[]},anamnesis:[],anamnesisAt:0,reactionIntensity:55,reactionChance:35,reactionCooldown:4,initiative:80,reactionCooldownRemaining:0,lastReaction:'',lastReactionId:'',randomKinkId:'',randomKinkIds:[],randomKinkPendingIds:[],manualKinkSelection:[],manualKinkPendingIds:[],randomKinkAt:0,contacts:[],history:[],historyNotice:true,anamnesisSummary:'',userFeelings:[],userEmotionScores:{...USER_FEELING_DEFAULTS},charName:'',updatedAt:Date.now(),diagnostics:{lastParseAt:0,lastParseStatus:'Ожидает проверки',lastParseError:''}});
 const ctx=()=>{try{return getContext?.()||globalThis.SillyTavern?.getContext?.()||{};}catch{return {};}};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const npcNameKey=value=>String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase();
@@ -133,6 +133,8 @@ function merge(raw){
  s.historyNotice=raw?.historyNotice!==false;
  s.randomKinkIds=Array.isArray(raw?.randomKinkIds)?raw.randomKinkIds:((raw?.randomKinkId?[raw.randomKinkId]:[]));
  s.randomKinkPendingIds=Array.isArray(raw?.randomKinkPendingIds)?raw.randomKinkPendingIds.filter(id=>allKinks().some(k=>k.id===id)):[];
+ s.manualKinkSelection=Array.isArray(raw?.manualKinkSelection)?raw.manualKinkSelection.filter(id=>allKinks().some(k=>k.id===id)):[];
+ s.manualKinkPendingIds=Array.isArray(raw?.manualKinkPendingIds)?raw.manualKinkPendingIds.filter(id=>allKinks().some(k=>k.id===id)):[];
  const dm=raw?.diagnosisManual||{};s.diagnosisManual={added:Array.isArray(dm.added)?dm.added:[],removed:Array.isArray(dm.removed)?dm.removed:[]};
  return s;
 }
@@ -374,7 +376,9 @@ function setDiagnosisManual(id,enabled){
   if(!dm.removed.includes(id))dm.removed.push(id);
   dm.added=dm.added.filter(x=>x!==id);
  }
- s.diagnosisManual=dm;syncDiagnosis(s);saveState(s);render();toast(enabled?'Добавлено в диагноз':'Убрано из диагноза');
+ s.diagnosisManual=dm;syncDiagnosis(s);
+ const diagnosed=new Set(s.diagnosis);s.manualKinkSelection=(s.manualKinkSelection||[]).filter(x=>diagnosed.has(x));s.manualKinkPendingIds=(s.manualKinkPendingIds||[]).filter(x=>diagnosed.has(x));s.randomKinkIds=(s.randomKinkIds||[]).filter(x=>diagnosed.has(x));s.randomKinkPendingIds=(s.randomKinkPendingIds||[]).filter(x=>diagnosed.has(x));if(!diagnosed.has(s.randomKinkId))s.randomKinkId='';
+ saveState(s);render();toast(enabled?'Добавлено в диагноз':'Убрано из диагноза');
 }
 function removeDiagnosisOnly(id){setDiagnosisManual(id,false);}
 let anamnesisRunning=false;
@@ -516,15 +520,16 @@ function parseLatest(){
  x.m.mes=(x.m.mes.slice(0,f.start)+x.m.mes.slice(f.end)).trimEnd();try{c.chat[x.i]=x.m;c.saveChat?.();}catch{}saveState(s);if(s.historyNotice&&f.packet?.shift)toast(`🩺 Новое наблюдение: ${String(f.packet.shift).slice(0,90)}`);return true;
 }
 function reactionPrompt(s){
- if(!s.autoReaction||!(s.anamnesis||[]).length)return'';
+ const diagnosis=Array.isArray(s.diagnosis)?s.diagnosis:[];
+ if(!s.autoReaction||!diagnosis.length)return'';
  if(s.reactionCooldownRemaining>0){s.reactionCooldownRemaining--;saveState(s);return'';}
- const valid=new Set(s.anamnesis||[]);
- let picks=Array.isArray(s.randomKinkIds)?s.randomKinkIds.filter(id=>valid.has(id)):[];
+ const valid=new Set(diagnosis);
+ let picks=Array.isArray(s.randomKinkIds)?s.randomKinkIds.filter(id=>valid.has(id)):[ ];
  if(!picks.length&&s.randomKinkId&&valid.has(s.randomKinkId))picks=[s.randomKinkId];
  if(!picks.length){
   if(Math.random()*100>s.reactionChance)return'';
-  const pool=(s.anamnesis||[]).filter(id=>id!==s.lastReactionId);
-  const source=pool.length?pool:s.anamnesis;
+  const pool=diagnosis.filter(id=>id!==s.lastReactionId);
+  const source=pool.length?pool:diagnosis;
   picks=[source[Math.floor(Math.random()*source.length)]];
  }
  picks=[...new Set(picks)].slice(0,3);
@@ -536,26 +541,49 @@ function reactionPrompt(s){
  const i=s.reactionIntensity,mode=i>=80?'эмоция может быть внешне очень заметной, но без автоматической эскалации':i>=60?'эмоция заметна окружающим, если это естественно':i>=35?'умеренная эмоциональная реакция':'сдержанная внутренняя реакция';
  const candidates=names.length>1?`Optional candidate cues: ${names.join(' / ')}.`:`Optional candidate cue: ${names[0]||'none'}.`;
  return`[LOVEMED REACTIVITY — THIS REPLY ONLY] ${candidates}
-Treat these as optional character cues, never as a checklist or an instruction to perform a kink. Choose at most ONE cue, and only if the current scene genuinely supports it; otherwise ignore all of them. Preserve the character's established personality, emotional nuance, consent, boundaries, and narrative pacing. Do not escalate sexual content just because a cue exists. Do not escalate sexual content solely because a cue exists. However, the separate CHARACTER INITIATIVE SETTING in the main LoveMed instructions means {{char}} may initiate flirtation, closeness, a kiss, or a consensual intimate development when character, relationship mode, and scene naturally support it; {{user}} does not have to make every first move. Never control {{user}}'s actions or consent. Intensity ${i}/100 affects only how visible an emotion is, never explicitness or escalation: ${mode}.`;
+These are optional cues selected ONLY from the current saved diagnosis list. They are not a checklist; use at most ONE only if the scene genuinely supports it. Preserve character, consent, boundaries, and pacing. Do not control {{user}}. Intensity ${i}/100 affects only how visible an emotion is, never explicitness or escalation: ${mode}.`;
 }
 function rollRandomKink(){
- const s=getState(),pool=[...new Set(scan().filter(id=>allKinks().some(k=>k.id===id)))];
- if(!pool.length){toast('В предпочтениях карточки {{char}} не найдено ни одного реактива. Проверьте раздел «Kinks / Fetishes / Preferences» и обновите анамнез.');return;}
- // Refresh the stored pool before rolling so stale results from the old whole-card scan cannot leak in.
- s.anamnesis=pool;s.diagnosis=diagnosisFor(s,pool);
- const shuffled=[...pool].sort(()=>Math.random()-0.5);
- const withoutLast=shuffled.filter(id=>id!==s.lastReactionId);
- const source=withoutLast.length>=Math.min(3,pool.length)?withoutLast:shuffled;
- const picks=source.slice(0,Math.min(3,source.length));
+ const s=getState(),valid=new Set(allKinks().map(k=>k.id));
+ // The die must use the already-saved diagnosis, never rescan the source card.
+ const pool=[...new Set((Array.isArray(s.diagnosis)?s.diagnosis:[]).filter(id=>valid.has(id)))];
+ if(!pool.length){toast('В диагнозе нет предпочтений для выбора. Сначала сформируйте диагноз и проверьте список.');return;}
+ const shuffled=[...pool];
+ for(let i=shuffled.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];}
+ const picks=shuffled.slice(0,Math.min(3,shuffled.length));
  s.randomKinkIds=picks;s.randomKinkId=picks[0]||'';s.randomKinkPendingIds=[];s.randomKinkAt=Date.now();
- saveState(s).then(()=>{render();toast(`🎲 Варианты: ${picks.map(id=>kink(id).name).join(' · ')}`);});
+ // A manual Spark choice and a random roll should not compete in the same reply.
+ s.manualKinkPendingIds=[];
+ saveState(s).then(()=>{render();toast(`🎲 Варианты из диагноза: ${picks.map(id=>kink(id).name).join(' · ')}`);});
+}
+function toggleManualKink(id){
+ const s=getState(),diagnosed=new Set(s.diagnosis||[]);if(!diagnosed.has(id)){toast('Выбирать можно только кинки из текущего диагноза');return;}
+ const selected=new Set(s.manualKinkSelection||[]);if(selected.has(id))selected.delete(id);else selected.add(id);
+ s.manualKinkSelection=[...selected];saveState(s).then(()=>render());
+}
+function activateManualKinks(){
+ const s=getState(),diagnosed=new Set(s.diagnosis||[]),selected=[...new Set(s.manualKinkSelection||[])].filter(id=>diagnosed.has(id));
+ if(!selected.length){toast('Сначала выбери один или несколько пунктов из диагноза');return;}
+ s.manualKinkPendingIds=selected;
+ // Clear random cues so the explicit choice is the sole focus of the next response.
+ s.randomKinkId='';s.randomKinkIds=[];s.randomKinkPendingIds=[];s.randomKinkAt=0;
+ saveState(s).then(()=>{render();toast(`✨ Искра активирована на следующий ответ: ${selected.map(id=>kink(id).name).join(' · ')}`);});
+}
+function clearManualKinks(){
+ const s=getState();s.manualKinkSelection=[];s.manualKinkPendingIds=[];saveState(s).then(()=>{render();toast('Ручной выбор очищен');});
+}
+function clearManualKinksAfterReply(){
+ const s=getState();if(!(s.manualKinkPendingIds||[]).length)return;
+ s.manualKinkPendingIds=[];saveState(s);
 }
 
 function prompt(opts={}){
  const s=getState();if(!s.enabled)return'';
  const rel=visible(s).map(k=>`${REL_LABEL[k]}=${Math.round(s.relation[k])}`).join(', ');
  const allRelScores=Object.fromEntries(REL_FIELDS.map(([k])=>[k,Math.round(clamp(s.relation[k]))]));
- const rx=opts.includeReaction?reactionPrompt(s):'';
+ const manualSparkIds=opts.includeReaction?[...new Set(s.manualKinkPendingIds||[])].filter(id=>(s.diagnosis||[]).includes(id)):[];
+ const rx=opts.includeReaction&&!manualSparkIds.length?reactionPrompt(s):'';
+ const manualSpark=manualSparkIds.length?`[LOVEMED MANUAL SPARK — PRIORITY FOR THIS REPLY ONLY] The user explicitly selected these kinks from the saved diagnosis: ${manualSparkIds.map(id=>{const k=kink(id);return `${k.name}${k.description?` (${k.description})`:''}`;}).join('; ')}. Treat this as a direct scene direction, not an optional suggestion and not merely background information. Build the next RP reply around the selected kink(s) in a concrete, recognizable way; do not silently ignore, replace, or dilute the selection. Let the scene progress through character-consistent actions and dialogue rather than just naming the kink. If multiple kinks are selected, weave them together naturally where feasible. Keep the scene coherent, preserve established characterization and boundaries, and never dictate {{user}}'s actions or consent. This one-shot directive applies to the next generated reply only.`:'';
  const relationMode=s.relationshipMode==='romantic'?'РОМАНТИЧЕСКАЯ — романтическая динамика разрешена.':s.relationshipMode==='platonic'?'ПЛАТОНИЧЕСКАЯ — развивай дружбу, доверие, симпатию и близость без автоматического развития романтических показателей.':'НЕЙТРАЛЬНАЯ — не предполагай романтическую или близкую связь; меняй отношения только при явных признаках текущей сцены.';
  const relKeys=REL_FIELDS.map(([k])=>k).join(', ');
  const userKeys=Object.keys(USER_FEELING_LABEL).join(', ');
@@ -573,6 +601,7 @@ Full relationship vocabulary: ${relKeys}
 Saved preference records: ${(s.diagnosis||[]).length}. These are reference data only, NOT active instructions. Do not introduce or escalate any saved preference unless a temporary LOVEMED REACTIVITY cue is provided for this reply; even then, that cue is optional and may be ignored when it does not fit the scene.
 ${s.lastShift?`Recent observation: ${s.lastShift}`:''}
 Known NPC relationship records (update ONLY these named characters; do not invent new records here): ${npcContext}
+${manualSpark}
 ${rx}
 Write the complete in-character RP response first, with a natural ending; do not stop mid-sentence or let the bookkeeping packet replace or truncate the narrative. Then append this compact private machine-readable packet at the very end, without explaining it. Keep the packet minimal and valid JSON. Analyze the current RP/context actually available to you, especially the current {{user}} actions, words and emotional cues. Never treat {{user}} as an NPC or add {{user}}, {{char}}, the current character name, or the user's persona name to contacts/NPC records. NPCs are ONLY those explicitly listed in Known NPC relationship records. Never create records in contacts or npc_updates.
 Relationship deltas are SIGNED changes, not absolute scores: use positive numbers when a feeling genuinely grows, negative numbers when it weakens, and 0 when unchanged. Love, desire, anger, fear, hate, trust, affection, jealousy, irritation, sadness and joy must respond independently to events: during a conflict, love can fall while anger, resentment or hate rises; during reconciliation, anger can fall while trust or affection rises. Do not freeze feelings at old values, and do not make all emotions rise together. Negative deltas are expected and important: after rejection, conflict, distance, disappointment, fear, reconciliation, comfort, or changed circumstances, reduce whichever indicators no longer fit. When a temporary emotion from the previous scene no longer fits (for example arousal, anger, fear, irritation, stress, or tension), let it subside with a small negative delta even if there is no dramatic event; do not automatically decay enduring feelings such as love or trust just because a reply passed. Do not monotonically increase values. Before choosing deltas, classify the actual emotional significance of this reply with impact: 'none' for routine conversation, presence, repeated affection without a meaningful development, or time passing; 'minor' for a concrete but ordinary emotional beat; 'major' only for a genuine turning point such as a serious betrayal, confession, breakup, rescue, or major reconciliation. For impact='none', every relationship delta must be 0. For 'minor', change at most 2 feelings, each by up to 3 internal points; for 'major', change at most 4 feelings, each by up to 8. The extension enforces both the per-feeling limit and the number of changed feelings in code. Missing or invalid impact means 'none', never 'minor'. Do not label routine dialogue as major. Usually change only one or two feelings that the event actually affects, not every positive feeling together. A routine message, time passing, or a character merely being present is not by itself a reason to change any score. Keep RP character-led and emotionally varied. Follow the established tone and level of detail of the scene instead of abruptly moralizing, censoring, euphemizing, or skipping past an event that the scene has already established. Do not force sexual content or kink escalation as a substitute for dialogue, plot, affection, conflict, humor, or ordinary interaction. Values are clamped to 0-200, so if a score is near 200 it can still decrease; if near 0 it can still increase. Base each delta on the current full scores and the current scene, not a generic trend. Choose up to 6 current salient relationship keys from the full vocabulary; active_feelings must reflect the CURRENT scene, not permanently repeat the same six. In PLATONIC or NEUTRAL mode, romantic relationship keys must stay unchanged and must not be selected as salient. In NEUTRAL mode, do not assume an existing bond unless the current scene provides evidence. CRITICAL TARGET RULE: Every relationship score shown in LoveMed is exclusively about that character's relationship TO {{user}}. It is NOT a general mood meter and must NEVER describe feelings toward Stella, another NPC, the environment, or events unrelated to {{user}}. The top-level relation and active_feelings belong to {{char}}'s feelings toward {{user}} only. Set char_user_interaction=true ONLY if {{char}} and {{user}} directly interact in this reply (direct dialogue, an action toward one another, or an unmistakable direct response between them). If {{char}} is talking to, watching, arguing with, touching, or reacting to another NPC while {{user}} is not the target of that interaction, set char_user_interaction=false and set every top-level relation delta to 0; do not change top-level active_feelings, shift, or history. Merely sharing a scene, being present, being mentioned, or the user's presence elsewhere is NOT direct interaction. Example: “Zane is stuck in his car dealing with Stella's ongoing emotional tirade” is Zane–Stella dynamics, not Zane–{{user}}; it must not change {{char}} → {{user}} relationship scores.
@@ -752,7 +781,7 @@ function bindUserCard(){
  if(!overlay||overlay.dataset.userDelegated)return;
  overlay.dataset.userDelegated='1';
  overlay.addEventListener('click',e=>{
-  const btn=e.target.closest?.('#lmSaveUserCard,#lmSaveUserHistory,#lmRefreshUserCard,#lmCheckUserRP,#lmRollKink,#lmResetKinkRoll,[data-save-char-card],[data-reset-char-card],[data-user-avatar-picker]');
+  const btn=e.target.closest?.('#lmSaveUserCard,#lmSaveUserHistory,#lmRefreshUserCard,#lmCheckUserRP,#lmRollKink,#lmResetKinkRoll,#lmActivateManualKinks,#lmClearManualKinks,[data-manual-kink],[data-save-char-card],[data-reset-char-card],[data-user-avatar-picker]');
   if(!btn)return;
   if(btn.matches('[data-user-avatar-picker]')){
    e.preventDefault();e.stopPropagation();
@@ -768,6 +797,9 @@ function bindUserCard(){
   else if(btn.matches('[data-reset-char-card]'))resetCharCard(btn.dataset.resetCharCard||'');
   else if(btn.id==='lmRollKink')rollRandomKink();
   else if(btn.id==='lmResetKinkRoll'){const st=getState();st.randomKinkId='';st.randomKinkIds=[];st.randomKinkPendingIds=[];st.randomKinkAt=0;saveState(st).then(()=>{render();toast('Кубик сброшен');});}
+  else if(btn.id==='lmActivateManualKinks')activateManualKinks();
+  else if(btn.id==='lmClearManualKinks')clearManualKinks();
+  else if(btn.matches('[data-manual-kink]'))toggleManualKink(btn.dataset.manualKink);
  });
  overlay.addEventListener('change',e=>{
   if(e.target?.id!=='lmUserAvatarFile')return;
@@ -879,7 +911,7 @@ function page(tab,s){
 if(tab==='react'){
  const randomIds=Array.isArray(s.randomKinkIds)&&s.randomKinkIds.length?s.randomKinkIds:(Array.isArray(s.randomKinkPendingIds)&&s.randomKinkPendingIds.length?s.randomKinkPendingIds:(s.randomKinkId?[s.randomKinkId]:[]));
  const randomNames=randomIds.map(id=>kink(id).name);
- return `<div class="lm-card"><section class="lm-section"><h3>Реактивность пациента</h3><div class="lm-sliders"><label>Выразительность эмоциональной реакции <b>${s.reactionIntensity}</b><input id="lmIntensity" type="range" min="0" max="100" value="${s.reactionIntensity}"></label><p class="lm-note">Этот параметр регулирует только заметность эмоций, а не инициативность персонажа, откровенность сцены или обязательную сексуальную эскалацию. Даже при высоком значении персонаж сохраняет характер, границы и естественный темп сюжета.</p><label>Вероятность спонтанной реакции <b>${s.reactionChance}%</b><input id="lmChance" type="range" min="0" max="100" value="${s.reactionChance}"></label><label>Пауза между спонтанными реакциями (ответов) <b>${s.reactionCooldown}</b><input id="lmCooldown" type="range" min="1" max="12" value="${s.reactionCooldown}"></label><label>Инициативность персонажа <b>${s.initiative}/100</b><input id="lmInitiative" type="range" min="0" max="100" value="${s.initiative}"></label><p class="lm-note">Отдельно регулирует, насколько часто персонаж сам делает первый шаг: флиртует, сокращает дистанцию, инициирует прикосновения или поцелуй и предлагает близость, если это соответствует характеру и сцене. Высокое значение не управляет действиями и согласием {{user}} и не означает автоматическую сексуальную эскалацию.</p></div></section><section class="lm-section lm-random-react"><h3>🎲 Ситуативный кубик</h3><p class="lm-note">Кубик выбирает до трёх вариантов из анамнеза только как необязательные подсказки. Модель не обязана использовать их: приоритет у текущей сцены, характера, согласия и темпа РП. Использованные варианты автоматически сбрасываются после ответа.</p><div class="lm-random-react-row"><button id="lmRollKink" type="button" class="lm-primary lm-dice-button">🎲 Выбрать варианты</button><button id="lmResetKinkRoll" type="button" class="lm-secondary lm-dice-reset" ${randomNames.length?'':'disabled'}>↻ Сбросить</button><div class="lm-random-result">${randomNames.length?`Варианты: <b>${esc(randomNames.join(' · '))}</b>`:'Варианты ещё не выбраны'}</div></div></section>${libraryPage(s)}</div>`;
+ return `<div class="lm-card"><section class="lm-section"><h3>Реактивность пациента</h3><div class="lm-sliders"><label>Выразительность эмоциональной реакции <b>${s.reactionIntensity}</b><input id="lmIntensity" type="range" min="0" max="100" value="${s.reactionIntensity}"></label><p class="lm-note">Этот параметр регулирует только заметность эмоций, а не инициативность персонажа, откровенность сцены или обязательную сексуальную эскалацию. Даже при высоком значении персонаж сохраняет характер, границы и естественный темп сюжета.</p><label>Вероятность спонтанной реакции <b>${s.reactionChance}%</b><input id="lmChance" type="range" min="0" max="100" value="${s.reactionChance}"></label><label>Пауза между спонтанными реакциями (ответов) <b>${s.reactionCooldown}</b><input id="lmCooldown" type="range" min="1" max="12" value="${s.reactionCooldown}"></label><label>Инициативность персонажа <b>${s.initiative}/100</b><input id="lmInitiative" type="range" min="0" max="100" value="${s.initiative}"></label><p class="lm-note">Отдельно регулирует, насколько часто персонаж сам делает первый шаг: флиртует, сокращает дистанцию, инициирует прикосновения или поцелуй и предлагает близость, если это соответствует характеру и сцене. Высокое значение не управляет действиями и согласием {{user}} и не означает автоматическую сексуальную эскалацию.</p></div></section><section class="lm-section lm-random-react"><h3>🎲 Ситуативный кубик</h3><p class="lm-note">Кубик выбирает до трёх случайных вариантов строго из сохранённого диагноза. Он не сканирует карточку повторно и не может вернуть пункт, удалённый из диагноза. Результат кубика — необязательная подсказка модели.</p><div class="lm-random-react-row"><button id="lmRollKink" type="button" class="lm-primary lm-dice-button">🎲 Выбрать 3 варианта из диагноза</button><button id="lmResetKinkRoll" type="button" class="lm-secondary lm-dice-reset" ${randomNames.length?'':'disabled'}>↻ Сбросить</button><div class="lm-random-result">${randomNames.length?`Варианты: <b>${esc(randomNames.join(' · '))}</b>`:'Варианты ещё не выбраны'}</div></div></section><section class="lm-section lm-manual-spark"><h3>✨ Искра — ручной выбор</h3><p class="lm-note">Выбери один или несколько пунктов из готового диагноза. После активации LoveMed передаст их модели как приоритетное указание на следующий ответ, а не как необязательную случайную подсказку. Модель всё равно сохраняет связность сцены и контроль пользователя над своей героиней.</p><div class="lm-manual-kink-grid">${(s.diagnosis||[]).map(id=>{const k=kink(id),selected=(s.manualKinkSelection||[]).includes(id),pending=(s.manualKinkPendingIds||[]).includes(id);return `<button type="button" class="lm-manual-kink-btn ${selected?'selected':''} ${pending?'pending':''}" data-manual-kink="${esc(id)}" aria-pressed="${selected?'true':'false'}"><span>${esc(k.name)}</span><em>${pending?'⚡ Активно':selected?'✓ Выбрано':'＋'}</em></button>`;}).join('')||'<i>Сначала сформируй диагноз на главной вкладке.</i>'}</div><div class="lm-manual-spark-actions"><button id="lmActivateManualKinks" type="button" class="lm-primary" ${(s.manualKinkSelection||[]).length?'':'disabled'}>✨ Активировать на следующий ответ</button><button id="lmClearManualKinks" type="button" class="lm-secondary">Очистить выбор</button></div>${(s.manualKinkPendingIds||[]).length?`<div class="lm-random-result lm-manual-pending">На следующий ответ: <b>${esc(s.manualKinkPendingIds.map(id=>kink(id).name).join(' · '))}</b></div>`:''}</section>${libraryPage(s)}</div>`;
 }
  if(tab==='contacts')return `<div class="lm-card lm-contacts-page"><section class="lm-section"><div class="lm-contacts-head"><div><h3>Контакты</h3><p class="lm-note">Компактный список отношений с NPC.</p></div><button type="button" id="lmNpcAddToggle" class="lm-npc-add" title="Добавить NPC">＋</button></div><div id="lmNpcForm" class="lm-npc-form hidden"><input id="lmNpcName" type="text" maxlength="100" placeholder="Имя NPC"><select id="lmNpcMode"><option value="romantic">💞 Романтические</option><option value="platonic">🤝 Платонические</option><option value="neutral" selected>🧩 Нейтральные</option></select><textarea id="lmNpcInfo" maxlength="2000" rows="3" placeholder="Информация о NPC: внешность, характер, роль в сюжете…"></textarea><button type="button" id="lmNpcAddSave" class="lm-npc-save">Добавить</button></div>${(s.npcRelationships||[]).map(n=>`<article class="lm-npc-row"><div class="lm-npc-row-content"><span class="lm-npc-row-heart">♡</span><div class="lm-npc-row-person"><span class="lm-npc-row-name" title="${esc(n.name)}">${esc(n.name)}</span>${n.info?`<span class="lm-npc-row-info" title="${esc(n.info)}">${esc(n.info)}</span>`:'<span class="lm-npc-row-info lm-npc-row-info-empty">Описание не добавлено</span>'}${npcDynamicsHtml(n)}${npcHistoryHtml(n)}</div></div><div class="lm-npc-row-footer"><select data-npc-mode="${esc(n.id)}" aria-label="Тип отношений с ${esc(n.name)}"><option value="romantic" ${n.mode==='romantic'?'selected':''}>💞 Романтические</option><option value="platonic" ${n.mode==='platonic'?'selected':''}>🤝 Платонические</option><option value="neutral" ${n.mode==='neutral'?'selected':''}>🧩 Нейтральные</option></select><button type="button" class="lm-npc-edit" data-edit-npc="${esc(n.id)}" title="Редактировать NPC" aria-label="Редактировать ${esc(n.name)}">✎</button><button type="button" class="lm-npc-delete" data-del-npc="${esc(n.id)}" title="Удалить NPC" aria-label="Удалить ${esc(n.name)}">×</button></div><div class="lm-npc-edit-panel hidden" data-npc-edit-panel="${esc(n.id)}"><div class="lm-npc-edit-panel-title">Редактирование NPC</div><label>Имя NPC<input data-npc-edit-field="name" type="text" maxlength="100" autocomplete="off" value="${esc(n.name||'')}"></label><label>Информация о NPC<textarea data-npc-edit-field="info" maxlength="2000" rows="3" placeholder="Внешность, характер, роль в сюжете…">${esc(n.info||'')}</textarea></label><label>Тип отношений<select data-npc-edit-field="mode"><option value="romantic" ${n.mode==='romantic'?'selected':''}>💞 Романтические</option><option value="platonic" ${n.mode==='platonic'?'selected':''}>🤝 Платонические</option><option value="neutral" ${n.mode==='neutral'?'selected':''}>🧩 Нейтральные</option></select></label><div class="lm-npc-edit-actions"><button type="button" class="lm-npc-edit-cancel" data-npc-edit-cancel>Отмена</button><button type="button" class="lm-npc-save" data-npc-edit-save="${esc(n.id)}">Сохранить</button></div></div></article>`).join('')||'<i>Пока нет NPC. Нажми ＋, чтобы добавить первого.</i>'}</section></div>`;
  if(tab==='history')return historyPage(s);
@@ -1061,7 +1093,7 @@ function init(){
  on(event_types.CHAT_CHANGED,()=>setTimeout(()=>{ensureFab();ensureSettings();ensureWand();render();refreshPrompt();},250));
  on(event_types.MESSAGE_RECEIVED,()=>setTimeout(parseLatest,250));
  on(event_types.GENERATION_STARTED,()=>refreshPrompt({includeReaction:true}));
- on(event_types.GENERATION_ENDED,()=>{parseLatest();refreshPrompt();const overlay=document.querySelector('#lmOverlay');if(overlay&&!overlay.classList.contains('hidden'))render();});
+ on(event_types.GENERATION_ENDED,()=>{parseLatest();clearManualKinksAfterReply();refreshPrompt();const overlay=document.querySelector('#lmOverlay');if(overlay&&!overlay.classList.contains('hidden'))render();});
  on(event_types.CHARACTER_EDITED,refreshPrompt);
  window.addEventListener('resize',placeFab);
  setInterval(()=>{ensureFab();ensureSettings();ensureWand();},2000);
