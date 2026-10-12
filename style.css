@@ -693,3 +693,18 @@
 .lm-fab.lm-fab-idle .lm-fab-mark{filter:drop-shadow(0 0 2px rgba(101,217,230,.12))}
 @media(prefers-reduced-motion:reduce){.lm-fab,.lm-fab .lm-fab-mark{transition:none!important}}
 @media(max-width:600px){.lm-fab{width:43px!important;height:43px!important;border-radius:15px 15px 15px 6px!important}.lm-fab .lm-fab-mark{width:29px!important;height:29px!important}}
+
+
+/* Manual Spark: select only items from the saved diagnosis and activate them for one reply. */
+.lm-manual-spark{border:1px solid rgba(243,109,155,.22)!important;border-radius:20px!important;background:linear-gradient(145deg,rgba(70,28,48,.28),rgba(7,17,19,.72))!important}
+.lm-manual-kink-grid{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0}
+.lm-manual-kink-btn{display:inline-flex;align-items:center;justify-content:space-between;gap:8px;max-width:100%;border:1px solid rgba(243,109,155,.24);border-radius:999px;background:rgba(141,39,72,.10);color:var(--lm-text);padding:8px 11px;cursor:pointer;text-align:left}
+.lm-manual-kink-btn span{overflow-wrap:anywhere}
+.lm-manual-kink-btn em{font-style:normal;color:#c7a7b4;font-size:11px;white-space:nowrap}
+.lm-manual-kink-btn.selected{border-color:rgba(243,109,155,.78);background:rgba(181,45,92,.24);box-shadow:0 0 0 1px rgba(243,109,155,.12) inset}
+.lm-manual-kink-btn.selected em{color:#ffd6e4}
+.lm-manual-kink-btn.pending{border-color:rgba(226,189,99,.8);background:rgba(226,189,99,.12)}
+.lm-manual-spark-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.lm-manual-spark-actions button{flex:1 1 180px}
+.lm-manual-pending{margin-top:10px}
+@media(max-width:600px){.lm-manual-kink-btn{max-width:100%;font-size:12px}.lm-manual-spark-actions button{width:100%}}
