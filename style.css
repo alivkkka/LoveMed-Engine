@@ -708,3 +708,24 @@
 .lm-manual-spark-actions button{flex:1 1 180px}
 .lm-manual-pending{margin-top:10px}
 @media(max-width:600px){.lm-manual-kink-btn{max-width:100%;font-size:12px}.lm-manual-spark-actions button{width:100%}}
+
+
+/* LoveMed v0.4.30 — dedicated gradual romantic-love track. */
+.lm-love-track{
+ margin:2px 0 9px;padding:10px 11px 11px;border-radius:15px;
+ border:1px solid rgba(243,109,155,.34);
+ background:linear-gradient(135deg,rgba(243,109,155,.105),rgba(33,156,201,.07));
+ box-shadow:inset 0 0 0 1px rgba(255,255,255,.018),0 4px 16px rgba(0,0,0,.08);
+}
+.lm-love-track-head{display:flex;align-items:center;gap:9px}
+.lm-love-track-icon{
+ display:grid;place-items:center;flex:0 0 31px;width:31px;height:31px;border-radius:11px;
+ color:#ff9fbd;font-size:20px;background:rgba(243,109,155,.13);
+ border:1px solid rgba(243,109,155,.24)
+}
+.lm-love-track-head>div{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.lm-love-track-head b{font-size:12px;color:var(--lm-text,#f4eaf0);font-weight:850}
+.lm-love-track-head small{font-size:10px;color:var(--lm-muted,#aab9c0);line-height:1.35}
+.lm-love-track-head strong{font-size:17px;color:#ff9fbd;font-weight:900;font-variant-numeric:tabular-nums}
+.lm-love-track-rail{height:5px;margin-top:10px;overflow:hidden;border-radius:99px;background:rgba(255,255,255,.08)}
+.lm-love-track-rail span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#c9578a,#ff9fbd);transition:width .35s ease}
