@@ -520,6 +520,8 @@ function detectUsedKinks(text,ids){
 function parseLatest(){
  const c=ctx();if(!c?.chat)return false;const x=[...c.chat].map((m,i)=>({m,i})).reverse().find(v=>!v.m.is_user&&typeof v.m.mes==='string');if(!x)return false;
  const f=parsePacket(x.m.mes),s=getState();
+ const cycleText=f?(x.m.mes.slice(0,f.start)+' '+x.m.mes.slice(f.end)):x.m.mes;
+ detectCycleCandidates(cycleText,x.i);
  // A rolled cue is a scene-level task, not a one-reply hint. Keep it active until the model
  // explicitly confirms that the cue was concretely portrayed in the narrative.
  const active=Array.isArray(s.randomKinkPendingIds)?s.randomKinkPendingIds:[];
@@ -697,6 +699,28 @@ function cycleSummary(c=getCycleState()){
  let phase=day<=c.periodLength?'Менструация':day<c.cycleLength-18?'Фолликулярная фаза':day<=c.cycleLength-11?'Ориентировочное фертильное окно':'Лютеиновая фаза';
  return {day,phase,next:nextDate.toISOString().slice(0,10),estimatedOvulation:ovulation.toISOString().slice(0,10)};
 }
+function cycleTextHash(text){let h=2166136261;for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(36);}
+function detectCycleCandidates(text,messageIndex){
+ const body=String(text||'').replace(/\[\[LOVEMED_STATE\]\][\s\S]*?\[\[\/LOVEMED_STATE\]\]/g,' ').trim();
+ if(body.length<30)return 0;
+ const normalized=body.toLocaleLowerCase().replace(/[ё]/g,'е');
+ const hash=`${chatKey()}:${messageIndex}:${cycleTextHash(normalized)}`;
+ const c=getCycleState();
+ const rules=[
+  {type:'period',re:/(?:начал(?:ась|ся|ись) менструац|пошл[аи] месячн|кровотечен.{0,35}(?:менстру|месячн)|period started|started (?:her|my) period|menstruation began|menstrual bleeding)/i,label:'В тексте обнаружено возможное начало менструации'},
+  {type:'contraception',re:/(?:презерватив|контрацепц|противозачаточ|таблетк.{0,25}(?:от беременности|контрацеп)|экстренн.{0,20}контрацеп|condom|contraception|birth control|morning.after pill)/i,label:'В тексте упоминается контрацепция'},
+  {type:'contact',re:/(?:занима(?:лись|ется|ются) сексом|секс.{0,25}(?:без презерватива|без защиты|защитой)|половой акт|проникновен.{0,30}(?:влагалищ|вагин)|кончил.{0,35}(?:внутр|в неё|в нее|внутри)|эякуляц|незащищенн.{0,25}(?:секс|акт)|unprotected sex|had sex|sexual intercourse|ejaculat.{0,30}(?:inside|in her)|came inside)/i,label:'В тексте обнаружен возможный сексуальный контакт'},
+  {type:'symptom',re:/(?:тошнот|утренн.{0,15}тошнот|бол.{0,15}груд.{0,20}(?:цикл|менстру|набух)|спазм.{0,20}(?:живот|матк)|тянущ.{0,20}низ живота|pregnancy symptoms|morning sickness|nausea|tender breasts|abdominal cramps)/i,label:'В тексте упоминается возможный симптом'},
+  {type:'test',re:/(?:тест.{0,25}(?:на беременность|показал|отрицательн|положительн)|беременност.{0,20}тест|pregnancy test|tested positive|tested negative)/i,label:'В тексте упоминается тест на беременность'},
+  {type:'pregnancy',re:/(?:оказал.{0,20}беремен|подтвердил.{0,20}беремен|беременна|беременен|беременность подтвержден|pregnant|pregnancy confirmed|positive pregnancy test)/i,label:'В тексте есть прямое упоминание беременности'}
+ ];
+ const matches=[];for(const rule of rules){const m=body.match(rule.re);if(!m)continue;const before=body.slice(Math.max(0,(m.index||0)-45),m.index||0);if(rule.type!=='contraception'&&rule.type!=='test'&&/(?:не|нет|без|не была|не был|не является|отрицательн|ложн|не беременн|not|never|no |without|isn't|is not|negative)/i.test(before))continue;matches.push({rule,match:m[0]});}
+ if(!matches.length)return 0;
+ const now=new Date(),today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;let added=0;
+ for(const {rule,match} of matches){if(c.events.some(e=>e.source==='auto'&&e.sourceRef===hash&&e.type===rule.type))continue;const description=`${rule.label}. Фрагмент: «${match.slice(0,180)}». Проверь контекст сцены перед подтверждением.`;c.events.push(normalizeCycleEvent({id:uid(),date:today,type:rule.type,description,status:'pending',source:'auto',sourceRef:hash}));added++;}
+ if(added){c.events=c.events.slice(-200);saveCycleState(c);toast(`🌙 LoveMed: ${added===1?'найдено событие':`найдено событий: ${added}`} — проверь во вкладке «Цикл»`);}
+ return added;
+}
 function saveCycleSettings(){
  const c=getCycleState();c.lastPeriodStart=document.querySelector('#lmCycleLastPeriod')?.value||'';c.cycleLength=Number(document.querySelector('#lmCycleLength')?.value)||28;c.periodLength=Number(document.querySelector('#lmCyclePeriodLength')?.value)||5;c.pregnancyStatus=document.querySelector('#lmCyclePregnancyStatus')?.value||'unknown';c.pregnancyChance=Number(document.querySelector('#lmCyclePregnancyChance')?.value)||0;c.contraceptionNotes=document.querySelector('#lmCycleContraception')?.value.trim()||'';c.notes=document.querySelector('#lmCycleNotes')?.value.trim()||'';c.pregnancyConfirmed=c.pregnancyStatus==='confirmed';saveCycleState(c);render();toast('Настройки цикла сохранены');
 }
@@ -711,8 +735,8 @@ function cyclePage(){
  const c=getCycleState(),sum=cycleSummary(c),statusLabels={unknown:'Не определена', 'not-pregnant':'Не подтверждена',possible:'Возможна по игровым условиям','pending-confirmation':'Ожидает подтверждения',confirmed:'Подтверждена в сюжете',ended:'Завершена'},typeLabels={contact:'Половой контакт',contraception:'Контрацепция',period:'Менструация',symptom:'Симптом',test:'Тест',pregnancy:'Беременность',other:'Другое'},statusText={pending:'На проверке',confirmed:'Подтверждено',rejected:'Отклонено'};
  const events=[...c.events].sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt);
  return `<div class="lm-card lm-cycle-page"><section class="lm-section"><div class="lm-cycle-heading"><div><span class="lm-label">LOVEMED · PERSONAL HEALTH</span><h3>Цикл и беременность</h3><p class="lm-note">Отдельный журнал состояния {{user}}. Даты и фазы пока являются ориентировочными игровыми оценками.</p></div><span class="lm-cycle-mark">♡</span></div><div class="lm-cycle-summary"><article><small>ДЕНЬ ЦИКЛА</small><strong>${sum.day===null?'—':sum.day}</strong><span>${sum.phase==='Не определена'?'Задай начало цикла':esc(sum.phase)}</span></article><article><small>СЛЕДУЮЩАЯ МЕНСТРУАЦИЯ</small><strong>${sum.next==='—'?'—':esc(sum.next)}</strong><span>Предварительная оценка</span></article><article><small>БЕРЕМЕННОСТЬ</small><strong>${esc(statusLabels[c.pregnancyStatus]||statusLabels.unknown)}</strong><span>${c.pregnancyConfirmed?'Отмечена как подтверждённая в сюжете':'Не является медицинским выводом'}</span></article></div></section>
- <section class="lm-section"><h3>Настройки цикла</h3><p class="lm-note">Задай исходные данные вручную. Автоматическое распознавание РП и проверка кандидатов событий будут подключены следующим этапом.</p><div class="lm-cycle-form"><label>Начало последней менструации<input id="lmCycleLastPeriod" type="date" value="${esc(c.lastPeriodStart)}"></label><label>Длина цикла (дней)<input id="lmCycleLength" type="number" min="20" max="45" value="${c.cycleLength}"></label><label>Длительность менструации (дней)<input id="lmCyclePeriodLength" type="number" min="2" max="10" value="${c.periodLength}"></label><label>Статус беременности<select id="lmCyclePregnancyStatus"><option value="unknown" ${c.pregnancyStatus==='unknown'?'selected':''}>Не определена</option><option value="not-pregnant" ${c.pregnancyStatus==='not-pregnant'?'selected':''}>Не подтверждена</option><option value="possible" ${c.pregnancyStatus==='possible'?'selected':''}>Возможна по игровым условиям</option><option value="pending-confirmation" ${c.pregnancyStatus==='pending-confirmation'?'selected':''}>Ожидает подтверждения</option><option value="confirmed" ${c.pregnancyStatus==='confirmed'?'selected':''}>Подтверждена в сюжете</option><option value="ended" ${c.pregnancyStatus==='ended'?'selected':''}>Завершена</option></select></label><label>Игровая вероятность (%)<input id="lmCyclePregnancyChance" type="number" min="0" max="90" value="${c.pregnancyChance}"></label><label class="lm-cycle-wide">Контрацепция / правила текущего сюжета<textarea id="lmCycleContraception" rows="2" placeholder="Что используется, когда принято, известные пропуски…">${esc(c.contraceptionNotes)}</textarea></label><label class="lm-cycle-wide">Заметки<textarea id="lmCycleNotes" rows="2" placeholder="Особенности цикла, отклонения, сюжетные условия…">${esc(c.notes)}</textarea></label></div><button id="lmCycleSaveSettings" type="button" class="lm-primary">Сохранить настройки</button></section>
- <section class="lm-section"><h3>Журнал событий</h3><p class="lm-note">Каждое событие имеет собственный ID и статус. Это основа для защиты от повторного учёта при подключении распознавания переписки.</p><div class="lm-cycle-form lm-cycle-event-form"><label>Дата события<input id="lmCycleEventDate" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Тип<select id="lmCycleEventType">${Object.entries(typeLabels).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label><label class="lm-cycle-wide">Описание<textarea id="lmCycleEventDescription" rows="2" maxlength="2000" placeholder="Что произошло в РП? Не добавляй предположения, которых не было в тексте."></textarea></label></div><button id="lmCycleAddEvent" type="button" class="lm-primary">＋ Добавить событие</button><div class="lm-cycle-events">${events.map(e=>`<article class="lm-cycle-event"><div class="lm-cycle-event-top"><span>${esc(typeLabels[e.type]||typeLabels.other)}</span><time>${esc(e.date)}</time><span class="lm-cycle-status ${e.status}">${esc(statusText[e.status]||statusText.pending)}</span></div><p>${esc(e.description)}</p><div class="lm-cycle-event-actions">${e.status!=='confirmed'?`<button type="button" data-cycle-confirm="${esc(e.id)}" class="lm-secondary">Подтвердить</button>`:''}${e.status!=='rejected'?`<button type="button" data-cycle-reject="${esc(e.id)}" class="lm-secondary">Отклонить</button>`:''}<button type="button" data-cycle-delete="${esc(e.id)}" class="lm-cycle-delete">Удалить</button></div></article>`).join('')||'<div class="lm-cycle-empty">Пока нет событий. Добавь запись вручную — она сохранится отдельно от истории отношений.</div>'}</div></section></div>`;
+ <section class="lm-section"><h3>Настройки цикла</h3><p class="lm-note">LoveMed просматривает новые ответы персонажа на предмет возможных событий и добавляет совпадения в журнал со статусом «На проверке». Распознавание основано на словесных маркерах и может ошибаться — подтверждай только то, что действительно произошло в сцене.</p><div class="lm-cycle-form"><label>Начало последней менструации<input id="lmCycleLastPeriod" type="date" value="${esc(c.lastPeriodStart)}"></label><label>Длина цикла (дней)<input id="lmCycleLength" type="number" min="20" max="45" value="${c.cycleLength}"></label><label>Длительность менструации (дней)<input id="lmCyclePeriodLength" type="number" min="2" max="10" value="${c.periodLength}"></label><label>Статус беременности<select id="lmCyclePregnancyStatus"><option value="unknown" ${c.pregnancyStatus==='unknown'?'selected':''}>Не определена</option><option value="not-pregnant" ${c.pregnancyStatus==='not-pregnant'?'selected':''}>Не подтверждена</option><option value="possible" ${c.pregnancyStatus==='possible'?'selected':''}>Возможна по игровым условиям</option><option value="pending-confirmation" ${c.pregnancyStatus==='pending-confirmation'?'selected':''}>Ожидает подтверждения</option><option value="confirmed" ${c.pregnancyStatus==='confirmed'?'selected':''}>Подтверждена в сюжете</option><option value="ended" ${c.pregnancyStatus==='ended'?'selected':''}>Завершена</option></select></label><label>Игровая вероятность (%)<input id="lmCyclePregnancyChance" type="number" min="0" max="90" value="${c.pregnancyChance}"></label><label class="lm-cycle-wide">Контрацепция / правила текущего сюжета<textarea id="lmCycleContraception" rows="2" placeholder="Что используется, когда принято, известные пропуски…">${esc(c.contraceptionNotes)}</textarea></label><label class="lm-cycle-wide">Заметки<textarea id="lmCycleNotes" rows="2" placeholder="Особенности цикла, отклонения, сюжетные условия…">${esc(c.notes)}</textarea></label></div><button id="lmCycleSaveSettings" type="button" class="lm-primary">Сохранить настройки</button></section>
+ <section class="lm-section"><h3>Журнал событий · ${(c.events.filter(e=>e.status==='pending').length)} на проверке</h3><p class="lm-note">События, найденные автоматически, помечаются как «Распознано из РП». Подтверждай только то, что действительно произошло; отклонённые события не участвуют в дальнейших расчётах.</p><div class="lm-cycle-form lm-cycle-event-form"><label>Дата события<input id="lmCycleEventDate" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Тип<select id="lmCycleEventType">${Object.entries(typeLabels).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label><label class="lm-cycle-wide">Описание<textarea id="lmCycleEventDescription" rows="2" maxlength="2000" placeholder="Что произошло в РП? Не добавляй предположения, которых не было в тексте."></textarea></label></div><button id="lmCycleAddEvent" type="button" class="lm-primary">＋ Добавить событие</button><div class="lm-cycle-events">${events.map(e=>`<article class="lm-cycle-event"><div class="lm-cycle-event-top"><span>${esc(typeLabels[e.type]||typeLabels.other)}</span>${e.source==='auto'?'<span class="lm-cycle-source">Распознано из РП</span>':''}<time>${esc(e.date)}</time><span class="lm-cycle-status ${e.status}">${esc(statusText[e.status]||statusText.pending)}</span></div><p>${esc(e.description)}</p><div class="lm-cycle-event-actions">${e.status!=='confirmed'?`<button type="button" data-cycle-confirm="${esc(e.id)}" class="lm-secondary">Подтвердить</button>`:''}${e.status!=='rejected'?`<button type="button" data-cycle-reject="${esc(e.id)}" class="lm-secondary">Отклонить</button>`:''}<button type="button" data-cycle-delete="${esc(e.id)}" class="lm-cycle-delete">Удалить</button></div></article>`).join('')||'<div class="lm-cycle-empty">Пока нет событий. Когда в ответах персонажа встретятся маркеры цикла, контрацепции, контакта, симптомов или теста, они появятся здесь на проверку.</div>'}</div></section></div>`;
 }
 function charCardKey(member=null){
  const suffix=member&&ctx()?.groupId?`:${charMemberKey(member)}`:'';
@@ -761,9 +785,6 @@ function idCardHeader(kind,label){
 function idField(label,value){return `<div class="lm-id-field"><span>${label}</span><b>${esc(value||'—')}</b></div>`;}
 function userCardTags(u){
  const tags=[];
- if(u.cycleHistory)tags.push('Цикл');
- if(u.ovulation)tags.push('Овуляция');
- if(u.menstruation)tags.push('Менструация');
  if(u.pregnancy)tags.push('Беременность');
  if(u.children)tags.push('Дети');
  return tags;
@@ -773,6 +794,7 @@ function roleplayText(){
  return c.chat.map(m=>typeof m?.mes==='string'?m.mes:'').filter(Boolean).join('\n');
 }
 function pregnancyRiskFromRP(text,u,contextText=''){
+ const cycle=getCycleState(),cycleInfo=cycleSummary(cycle),baseChance=Math.max(0,Math.min(90,Number(cycle.pregnancyChance)||0));
  const raw=String(text||'').replace(/\[\[LOVEMED_STATE\]\][\s\S]*?\[\[\/LOVEMED_STATE\]\]/g,' ');
  const contextRaw=String(contextText||raw).replace(/\[\[LOVEMED_STATE\]\][\s\S]*?\[\[\/LOVEMED_STATE\]\]/g,' ');
  const sentences=raw.split(/[.!?\n]+/).map(x=>x.trim()).filter(Boolean);
@@ -798,20 +820,20 @@ function pregnancyRiskFromRP(text,u,contextText=''){
  const inside=sexSentences.some(x=>insidePattern.test(x));
  const unprotected=inside||/(?:без\s+(?:презерватива|защиты)|незащищ[её]н\w*|беззащитн\w*|презерватив\w*\s+не\s+был|не\s+использовал\w*\s+(?:презерватив|защиту)|without\s+(?:a\s+)?condom|unprotected\s+sex|no\s+condom|condom\s+(?:broke|split|tore|failed))/i.test(raw);
  if(contraceptionTaken&&!contraceptionFailure){
-  const base=Number.isFinite(Number(u.pregnancyChance))?Math.max(0,Math.min(90,Number(u.pregnancyChance))):25;
+  const base=baseChance;
   // A small fictional per-scene failure chance keeps the RP tracker dynamic without treating contraception as automatically ineffective.
   const chance=Math.max(0,Math.min(90,Math.round(base*0.04*eventCount*10)/10));
   return {status:'contraception_taken',risk:true,confirmed:false,chance,eventCount,inside,contraceptionTaken:true,contraceptionFailure:false,reason:`В РП обнаружен половой контакт${inside?' с эякуляцией внутрь':''}; приём контрацептивов упомянут, явных признаков пропуска или сбоя не найдено. Игровой шанс сбоя: ${chance}%.`};
  }
  if(contraceptionFailure){
-  const base=Number.isFinite(Number(u.pregnancyChance))?Math.max(0,Math.min(90,Number(u.pregnancyChance))):25;
+  const base=baseChance;
   return {status:'contraception_failure',risk:true,confirmed:false,chance:base,eventCount,inside,contraceptionTaken,contraceptionFailure:true,reason:`В РП обнаружены признаки пропуска или сбоя контрацепции; для игровой проверки используется базовый шанс ${base}%.`};
  }
  if(condom&&!unprotected)return {status:'condom_protection',risk:false,confirmed:false,chance:0,eventCount,inside:false,reason:'В РП упомянут презерватив; признаков его повреждения или отказа не найдено.'};
  if(!unprotected)return {status:'insufficient_evidence',risk:false,confirmed:false,chance:0,eventCount,reason:'Половой контакт обнаружен, но текст не подтверждает эякуляцию внутрь, отсутствие защиты или сбой контрацепции.'};
  let chance=Number(u.pregnancyChance);if(!Number.isFinite(chance))chance=25;
- if(/овуляц|овулятор|ovulat/i.test(contextRaw)||/овуляц|овулятор|ovulat/i.test(String(u.ovulation||'')))chance+=20;
- if(/менструац|месячн|menstruat|period/i.test(contextRaw)||/менструац|месячн|menstruat|period/i.test(String(u.menstruation||'')))chance-=10;
+ if(cycleInfo.phase==='Ориентировочное фертильное окно')chance+=20;
+ if(cycleInfo.phase==='Менструация')chance-=10;
  chance=Math.max(0,Math.min(90,chance));
  return {status:'unprotected',risk:true,confirmed:false,chance,eventCount,inside,contraceptionTaken:false,contraceptionFailure:false,reason:`В РП обнаружен незащищённый половой контакт${inside?' с эякуляцией внутрь':''}; игровой шанс беременности ${chance}%.`};
 }
@@ -913,17 +935,12 @@ function userCardPage(){
    <div class="lm-idcard-tags">${tags.map(t=>`<span><i>♥</i>${esc(t)}</span>`).join('')||'<span><i>♥</i>Наблюдение не заполнено</span>'}</div>
    <section class="lm-user-feelings"><div class="lm-idcard-mini-title">ТЕКУЩЕЕ СОСТОЯНИЕ</div><div class="lm-feeling-chips">${sUserFeelings().map(k=>`<span><i>✦</i>${esc(USER_FEELING_LABEL[k])}</span>`).join('')||'<span><i>✦</i>Состояние пока не определено</span>'}</div></section>
    <div class="lm-idcard-quote">${esc(u.rpObservation||u.notes||'Состояние пользователя: данные наблюдения пока не заполнены. Нажмите «Проверить состояние по РП», чтобы создать первое наблюдение.')}</div>
-   <section class="lm-user-health"><div class="lm-idcard-mini-title">СОСТОЯНИЕ ЦИКЛА</div>
-    <label class="lm-health-row"><span>ЦИКЛ</span><input id="lmUserCycle" value="${esc(u.cycleHistory)}" placeholder="Не указан" aria-label="Цикл"></label>
-    <label class="lm-health-row"><span>ОВУЛЯЦИЯ</span><input id="lmUserOvulation" value="${esc(u.ovulation)}" placeholder="Не указана" aria-label="Овуляция"></label>
-    <label class="lm-health-row"><span>МЕНСТРУАЦИЯ</span><input id="lmUserMenstruation" value="${esc(u.menstruation)}" placeholder="Не указана" aria-label="Менструация"></label>
-   </section>
    <div class="lm-idcard-actions"><button id="lmCheckUserRP" type="button" class="lm-primary">🩺 Проверить состояние по РП</button><button id="lmSaveUserCard" type="button" class="lm-secondary">Сохранить данные</button><button id="lmRefreshUserCard" type="button" class="lm-secondary">Обновить из персоны</button></div>
    <details class="lm-idcard-edit"><summary>Редактировать данные карты</summary>
     <div class="lm-user-grid">
      <label>Имя<input id="lmUserName" value="${esc(u.name)}" placeholder="Имя"></label><label>Возраст<input id="lmUserAge" value="${esc(u.age)}" placeholder="Не указан"></label>
      <label>Пол<input id="lmUserSex" value="${esc(u.sex)}" placeholder="Не указан"></label><label>Гендер<input id="lmUserGender" value="${esc(u.gender)}" placeholder="Не указан"></label>
-     <label>Вторичный пол<input id="lmUserSecondary" value="${esc(u.secondarySex)}" placeholder="Не указан"></label><label>Шанс беременности<input id="lmUserPregChance" type="number" min="0" max="90" value="${esc(u.pregnancyChance)}" placeholder="25"></label><label>Аватар<input id="lmUserAvatar" value="${esc(u.avatar)}" placeholder="Автоматически из персоны"></label>
+     <label>Вторичный пол<input id="lmUserSecondary" value="${esc(u.secondarySex)}" placeholder="Не указан"></label><label>Аватар<input id="lmUserAvatar" value="${esc(u.avatar)}" placeholder="Автоматически из персоны"></label>
     </div>
     <div class="lm-history-grid">
      <label>Беременность<textarea id="lmUserPregnancy" placeholder="История беременностей...">${esc(u.pregnancy)}</textarea></label>
@@ -933,9 +950,9 @@ function userCardPage(){
    </details>
   </div>`;
 }
-function collectUserIdentity(){let pc=Number(document.querySelector('#lmUserPregChance')?.value);if(!Number.isFinite(pc))pc=25;return {name:document.querySelector('#lmUserName')?.value.trim()||'',age:document.querySelector('#lmUserAge')?.value.trim()||'',sex:document.querySelector('#lmUserSex')?.value.trim()||'',gender:document.querySelector('#lmUserGender')?.value.trim()||'',secondarySex:document.querySelector('#lmUserSecondary')?.value.trim()||'',avatar:document.querySelector('#lmUserAvatar')?.value.trim()||getUserCard().avatar||'',pregnancyChance:Math.max(0,Math.min(90,pc))};}
+function collectUserIdentity(){return {name:document.querySelector('#lmUserName')?.value.trim()||'',age:document.querySelector('#lmUserAge')?.value.trim()||'',sex:document.querySelector('#lmUserSex')?.value.trim()||'',gender:document.querySelector('#lmUserGender')?.value.trim()||'',secondarySex:document.querySelector('#lmUserSecondary')?.value.trim()||'',avatar:document.querySelector('#lmUserAvatar')?.value.trim()||getUserCard().avatar||''};}
 function saveUserIdentity(){saveUserCard(Object.assign(getUserCard(),collectUserIdentity()));render();toast('Данные пользователя сохранены');}
-function saveUserHistory(){saveUserCard(Object.assign(getUserCard(),{cycleHistory:document.querySelector('#lmUserCycle')?.value.trim()||'',ovulation:document.querySelector('#lmUserOvulation')?.value.trim()||'',menstruation:document.querySelector('#lmUserMenstruation')?.value.trim()||'',pregnancy:document.querySelector('#lmUserPregnancy')?.value.trim()||'',children:document.querySelector('#lmUserChildren')?.value.trim()||'',pregnancyResult:document.querySelector('#lmUserPregResult')?.value.trim()||'',notes:document.querySelector('#lmUserNotes')?.value.trim()||''}));render();toast('История пользователя сохранена');}
+function saveUserHistory(){saveUserCard(Object.assign(getUserCard(),{pregnancy:document.querySelector('#lmUserPregnancy')?.value.trim()||'',children:document.querySelector('#lmUserChildren')?.value.trim()||'',pregnancyResult:document.querySelector('#lmUserPregResult')?.value.trim()||'',notes:document.querySelector('#lmUserNotes')?.value.trim()||''}));render();toast('История пользователя сохранена');}
 function bindUserCard(){
  const overlay=document.querySelector('#lmOverlay');
  if(!overlay||overlay.dataset.userDelegated)return;
@@ -972,21 +989,17 @@ function bindUserCard(){
  });
  overlay.addEventListener('change',e=>{
   const id=e.target?.id;
-  if(['lmUserName','lmUserAge','lmUserSex','lmUserGender','lmUserSecondary','lmUserPregChance'].includes(id)){
+  if(['lmUserName','lmUserAge','lmUserSex','lmUserGender','lmUserSecondary'].includes(id)){
    const u=getUserCard();
    if(id==='lmUserName')u.name=e.target.value.trim();
    if(id==='lmUserAge')u.age=e.target.value.trim();
    if(id==='lmUserSex')u.sex=e.target.value.trim();
    if(id==='lmUserGender')u.gender=e.target.value.trim();
    if(id==='lmUserSecondary')u.secondarySex=e.target.value.trim();
-   if(id==='lmUserPregChance'){const n=Number(e.target.value);u.pregnancyChance=Number.isFinite(n)?Math.max(0,Math.min(90,n)):25;}
    saveUserCard(u);
   }
-  if(['lmUserCycle','lmUserOvulation','lmUserMenstruation','lmUserPregnancy','lmUserChildren','lmUserPregResult','lmUserNotes'].includes(id)){
+  if(['lmUserPregnancy','lmUserChildren','lmUserPregResult','lmUserNotes'].includes(id)){
    const u=getUserCard();
-   if(id==='lmUserCycle')u.cycleHistory=e.target.value.trim();
-   if(id==='lmUserOvulation')u.ovulation=e.target.value.trim();
-   if(id==='lmUserMenstruation')u.menstruation=e.target.value.trim();
    if(id==='lmUserPregnancy')u.pregnancy=e.target.value.trim();
    if(id==='lmUserChildren')u.children=e.target.value.trim();
    if(id==='lmUserPregResult')u.pregnancyResult=e.target.value.trim();
@@ -1208,7 +1221,7 @@ function bind(){
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.4.34</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['cycle','🌙 Цикл'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.4.35</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['cycle','🌙 Цикл'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
  document.querySelector('#lmClose').onclick=()=>{editorId=null;document.querySelector('#lmOverlay').classList.add('hidden');syncFab();};
  const overlay=document.querySelector('#lmOverlay');
  if(overlay&&!overlay.dataset.lovemedDelegated){
