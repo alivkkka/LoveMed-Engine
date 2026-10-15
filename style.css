@@ -729,3 +729,36 @@
 .lm-love-track-head strong{font-size:17px;color:#ff9fbd;font-weight:900;font-variant-numeric:tabular-nums}
 .lm-love-track-rail{height:5px;margin-top:10px;overflow:hidden;border-radius:99px;background:rgba(255,255,255,.08)}
 .lm-love-track-rail span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#c9578a,#ff9fbd);transition:width .35s ease}
+
+/* v0.4.33 — show multi-line RP observations as readable journal entries */
+.lm-user-idcard .lm-idcard-quote{white-space:pre-line;}
+
+/* Cycle & pregnancy module — isolated visual layer, matching LoveMed palette */
+.lm-cycle-page .lm-cycle-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.lm-cycle-page .lm-cycle-heading h3{font:700 25px Georgia,serif;margin:5px 0 7px;color:#f5eeee}
+.lm-cycle-mark{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border-radius:16px;border:1px solid rgba(243,109,155,.35);background:linear-gradient(145deg,rgba(118,35,66,.42),rgba(7,17,19,.9));color:#f36d9b;font-size:29px;box-shadow:inset 0 0 20px rgba(243,109,155,.08)}
+.lm-cycle-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:14px}
+.lm-cycle-summary article{min-width:0;padding:12px;border-radius:15px;border:1px solid var(--lm-line);background:linear-gradient(150deg,rgba(18,39,41,.75),rgba(7,17,19,.88));display:flex;flex-direction:column;gap:5px}
+.lm-cycle-summary small{font-size:9px;letter-spacing:.12em;color:var(--lm-teal);font-weight:900}
+.lm-cycle-summary strong{font:700 16px Georgia,serif;color:#f7e9ed;overflow-wrap:anywhere}
+.lm-cycle-summary span{font-size:11px;line-height:1.4;color:var(--lm-muted)}
+.lm-cycle-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:12px 0}
+.lm-cycle-form label{display:grid;gap:6px;min-width:0;font-size:12px;color:#b9cbca}
+.lm-cycle-form input,.lm-cycle-form select,.lm-cycle-form textarea{box-sizing:border-box;width:100%;min-width:0;border:1px solid var(--lm-line);border-radius:12px;background:#071113;color:#f5eeee;padding:10px;font:inherit;outline:none}
+.lm-cycle-form input:focus,.lm-cycle-form select:focus,.lm-cycle-form textarea:focus{border-color:#45eee488;box-shadow:0 0 0 2px #45eee411}
+.lm-cycle-form textarea{resize:vertical;min-height:58px}
+.lm-cycle-wide{grid-column:1/-1}
+.lm-cycle-event-form{padding:12px;border:1px solid var(--lm-line);border-radius:16px;background:rgba(5,14,16,.42)}
+.lm-cycle-events{display:grid;gap:9px;margin-top:14px}
+.lm-cycle-event{padding:12px;border-radius:15px;border:1px solid var(--lm-line);background:rgba(7,17,19,.76)}
+.lm-cycle-event-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:#dce9e8}
+.lm-cycle-event-top time{color:var(--lm-muted)}
+.lm-cycle-status{margin-left:auto;border-radius:999px;padding:4px 8px;border:1px solid #45eee433;color:#a9bbbb;font-size:10px}
+.lm-cycle-status.confirmed{color:#8de8c1;border-color:#8de8c155;background:#8de8c10d}
+.lm-cycle-status.rejected{color:#f19aa6;border-color:#f19aa655;background:#f19aa60d}
+.lm-cycle-event p{margin:10px 0;color:#e7eeee;font-size:13px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.lm-cycle-event-actions{display:flex;gap:7px;flex-wrap:wrap}
+.lm-cycle-event-actions button{font-size:11px;padding:7px 10px}
+.lm-cycle-delete{border:1px solid #f36d9b44;border-radius:999px;background:transparent;color:#eaa0b7;cursor:pointer}
+.lm-cycle-empty{padding:18px;border:1px dashed var(--lm-line);border-radius:14px;color:var(--lm-muted);font-size:12px;text-align:center}
+@media(max-width:600px){.lm-cycle-summary{grid-template-columns:1fr}.lm-cycle-summary article{display:grid;grid-template-columns:1fr auto;align-items:center}.lm-cycle-summary small,.lm-cycle-summary span{grid-column:1}.lm-cycle-summary strong{grid-column:2;grid-row:1/3;text-align:right}.lm-cycle-form{grid-template-columns:1fr}.lm-cycle-wide{grid-column:auto}.lm-cycle-page .lm-cycle-heading h3{font-size:22px}}
