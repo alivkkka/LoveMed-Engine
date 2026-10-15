@@ -764,3 +764,16 @@
 @media(max-width:600px){.lm-cycle-summary{grid-template-columns:1fr}.lm-cycle-summary article{display:grid;grid-template-columns:1fr auto;align-items:center}.lm-cycle-summary small,.lm-cycle-summary span{grid-column:1}.lm-cycle-summary strong{grid-column:2;grid-row:1/3;text-align:right}.lm-cycle-form{grid-template-columns:1fr}.lm-cycle-wide{grid-column:auto}.lm-cycle-page .lm-cycle-heading h3{font-size:22px}}
 
 .lm-cycle-source{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;border:1px solid rgba(69,238,228,.22);background:rgba(69,238,228,.06);color:var(--lm-teal2);font-size:9px;letter-spacing:.02em}
+
+
+/* LoveMed v0.4.37 — delayed in-story conception surprise notification. */
+.lm-cycle-notice-toggle{display:flex!important;grid-template-columns:auto 1fr!important;align-items:flex-start;gap:9px!important;padding:10px 12px;border:1px solid rgba(243,109,155,.24);border-radius:12px;background:rgba(141,39,72,.09);line-height:1.45}
+.lm-cycle-notice-toggle input{width:16px!important;height:16px;flex:0 0 16px;accent-color:#f36d9b;margin:1px 0 0}
+.lm-conception-notice{position:fixed;right:22px;top:22px;z-index:2147483647;width:min(390px,calc(100vw - 28px));box-sizing:border-box;padding:20px 20px 17px;border:1px solid rgba(243,109,155,.52);border-radius:20px;background:radial-gradient(ellipse at 100% 0,rgba(141,39,72,.32),transparent 58%),linear-gradient(145deg,rgba(14,27,30,.98),rgba(5,13,15,.985));color:#f7eeee;box-shadow:0 18px 65px rgba(0,0,0,.55),0 0 28px rgba(243,109,155,.12);font-family:Inter,system-ui,sans-serif;animation:lm-conception-in .42s cubic-bezier(.2,.8,.2,1) both;backdrop-filter:blur(14px)}
+.lm-conception-notice-kicker{font-size:9px;font-weight:900;letter-spacing:.16em;color:#ff9fbd;padding-right:22px}
+.lm-conception-notice-title{margin:12px 20px 8px 0;font:700 22px/1.2 Georgia,serif;color:#fff1f5}
+.lm-conception-notice p{margin:0 0 12px;color:#e9dfe4;font-size:13px;line-height:1.55}
+.lm-conception-notice small{display:block;padding-top:10px;border-top:1px solid rgba(243,109,155,.18);font-size:10px;line-height:1.4;color:#b9aab1}
+.lm-conception-notice-close{position:absolute;right:10px;top:9px;width:28px;height:28px;border:1px solid rgba(255,255,255,.12);border-radius:9px;background:rgba(255,255,255,.05);color:#f7dbe4;font-size:20px;line-height:1;cursor:pointer}
+@keyframes lm-conception-in{from{opacity:0;transform:translateY(-10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:600px){.lm-conception-notice{right:10px;top:10px;width:calc(100vw - 20px);padding:17px}.lm-conception-notice-title{font-size:20px}}
