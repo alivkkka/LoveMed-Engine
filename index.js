@@ -676,7 +676,7 @@ function cycleKey(){return `lovemed_cycle_v1:${chatKey()}`;}
 function normalizeCycleEvent(raw={}){
  const allowed=['contact','contraception','period','symptom','test','pregnancy','other'];
  const statuses=['pending','confirmed','rejected'];
- return {id:String(raw.id||uid()),date:String(raw.date||new Date().toISOString().slice(0,10)).slice(0,10),type:allowed.includes(raw.type)?raw.type:'other',description:String(raw.description||'').slice(0,2000),status:statuses.includes(raw.status)?raw.status:'pending',source:String(raw.source||'manual').slice(0,30),sourceRef:String(raw.sourceRef||'').slice(0,200),conceptionChecked:!!raw.conceptionChecked,conceptionResult:['pregnant','not-pregnant','skipped'].includes(raw.conceptionResult)?raw.conceptionResult:'',conceptionChance:Math.max(0,Math.min(90,Number(raw.conceptionChance)||0)),conceptionReason:String(raw.conceptionReason||'').slice(0,500),conceptionNoticeDueAt:Number(raw.conceptionNoticeDueAt)||0,conceptionNoticeShownAt:Number(raw.conceptionNoticeShownAt)||0,createdAt:Number(raw.createdAt)||Date.now(),updatedAt:Number(raw.updatedAt)||Date.now()};
+ return {id:String(raw.id||uid()),date:String(raw.date||new Date().toISOString().slice(0,10)).slice(0,10),type:allowed.includes(raw.type)?raw.type:'other',description:String(raw.description||'').slice(0,2000),status:statuses.includes(raw.status)?raw.status:'pending',source:String(raw.source||'manual').slice(0,30),sourceRef:String(raw.sourceRef||'').slice(0,200),messageIndex:Number.isFinite(Number(raw.messageIndex))?Number(raw.messageIndex):-1,conceptionChecked:!!raw.conceptionChecked,conceptionResult:['pregnant','not-pregnant','skipped'].includes(raw.conceptionResult)?raw.conceptionResult:'',conceptionChance:Math.max(0,Math.min(90,Number(raw.conceptionChance)||0)),conceptionReason:String(raw.conceptionReason||'').slice(0,500),conceptionNoticeDueAt:Number(raw.conceptionNoticeDueAt)||0,conceptionNoticeShownAt:Number(raw.conceptionNoticeShownAt)||0,createdAt:Number(raw.createdAt)||Date.now(),updatedAt:Number(raw.updatedAt)||Date.now()};
 }
 function getCycleState(){
  const base=cycleDefaults();let raw=null;
@@ -729,8 +729,20 @@ function detectCycleCandidates(text,messageIndex){
  for(const {rule,match} of matches){
   if(c.events.some(e=>e.source==='auto'&&e.sourceRef===hash&&e.type===rule.type))continue;
   const at=body.toLocaleLowerCase().indexOf(match.toLocaleLowerCase()),excerpt=body.slice(Math.max(0,at-130),Math.min(body.length,at+match.length+170)).replace(/\s+/g,' ').trim(),autoContact=rule.type==='contact';
+  // A single intimate scene often spans several consecutive RP replies. Merge contact
+  // detections from nearby messages into one scene event, so it gets only one conception roll.
+  const recentContact=autoContact?c.events.filter(e=>e.source==='auto'&&e.type==='contact'&&e.status!=='rejected').map(e=>{
+   let idx=Number(e.messageIndex);if(!Number.isFinite(idx)||idx<0){const m=String(e.sourceRef||'').match(/:(\d+):[a-z0-9]+$/i);idx=m?Number(m[1]):-1;}return {event:e,index:idx};
+  }).filter(x=>x.index>=0&&messageIndex>=x.index&&messageIndex-x.index<=6).sort((a,b)=>b.index-a.index)[0]:null;
+  if(recentContact){
+   const event=recentContact.event;event.messageIndex=messageIndex;event.sourceRef=hash;event.updatedAt=Date.now();
+   const addendum=`Продолжение той же сцены (сообщение ${messageIndex+1}): «${excerpt.slice(0,240)}».`;
+   if(!event.description.includes(addendum))event.description=(event.description+' '+addendum).slice(0,2000);
+   // Do not run another conception roll for the same multi-message scene.
+   added++;continue;
+  }
   const description=`${rule.label}. Фрагмент сцены: «${excerpt.slice(0,420)}». ${autoContact?'Событие автоматически обработано игровой системой.':'Проверь контекст перед подтверждением.'}`;
-  const event=normalizeCycleEvent({id:uid(),date:today,type:rule.type,description,status:autoContact?'confirmed':'pending',source:'auto',sourceRef:hash});c.events.push(event);
+  const event=normalizeCycleEvent({id:uid(),date:today,type:rule.type,description,status:autoContact?'confirmed':'pending',source:'auto',sourceRef:hash,messageIndex});c.events.push(event);
   if(autoContact)calculateConceptionForEvent(c,event);
   added++;
  }
