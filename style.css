@@ -784,3 +784,10 @@
 .lm-pregnancy-tracker span{display:block;font-size:11px;line-height:1.35;opacity:.8}
 @keyframes lm-conception-in{from{opacity:0;transform:translateY(-6px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:600px){.lm-conception-notice{right:8px;top:max(8px,env(safe-area-inset-top));width:min(260px,calc(100vw - 16px));padding:10px;border-radius:12px}.lm-conception-notice-title{font-size:14px}.lm-conception-notice p{font-size:10.5px}.lm-pregnancy-tracker{grid-template-columns:minmax(0,1fr);gap:7px}.lm-pregnancy-tracker>div{padding:10px}}
+
+/* v0.4.39: mobile-friendly test notification controls and continuity note */
+.lm-cycle-test-notice{margin-top:8px;width:100%;min-height:38px}
+.lm-cycle-persistence-note{margin-top:9px;max-width:70ch}
+.lm-conception-notice-test{border-color:rgba(101,217,230,.5);box-shadow:0 8px 28px rgba(0,0,0,.42),0 0 14px rgba(101,217,230,.12)}
+.lm-conception-notice-test .lm-conception-notice-kicker{color:#8cebf1}
+.lm-conception-notice-test .lm-conception-notice-icon{color:#a6fff7;border-color:rgba(101,217,230,.28);background:rgba(101,217,230,.1)}
