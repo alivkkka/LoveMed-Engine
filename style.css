@@ -766,14 +766,21 @@
 .lm-cycle-source{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;border:1px solid rgba(69,238,228,.22);background:rgba(69,238,228,.06);color:var(--lm-teal2);font-size:9px;letter-spacing:.02em}
 
 
-/* LoveMed v0.4.37 — delayed in-story conception surprise notification. */
+/* LoveMed v0.4.38 — compact, phone-friendly conception notification. */
 .lm-cycle-notice-toggle{display:flex!important;grid-template-columns:auto 1fr!important;align-items:flex-start;gap:9px!important;padding:10px 12px;border:1px solid rgba(243,109,155,.24);border-radius:12px;background:rgba(141,39,72,.09);line-height:1.45}
 .lm-cycle-notice-toggle input{width:16px!important;height:16px;flex:0 0 16px;accent-color:#f36d9b;margin:1px 0 0}
-.lm-conception-notice{position:fixed;right:22px;top:22px;z-index:2147483647;width:min(390px,calc(100vw - 28px));box-sizing:border-box;padding:20px 20px 17px;border:1px solid rgba(243,109,155,.52);border-radius:20px;background:radial-gradient(ellipse at 100% 0,rgba(141,39,72,.32),transparent 58%),linear-gradient(145deg,rgba(14,27,30,.98),rgba(5,13,15,.985));color:#f7eeee;box-shadow:0 18px 65px rgba(0,0,0,.55),0 0 28px rgba(243,109,155,.12);font-family:Inter,system-ui,sans-serif;animation:lm-conception-in .42s cubic-bezier(.2,.8,.2,1) both;backdrop-filter:blur(14px)}
-.lm-conception-notice-kicker{font-size:9px;font-weight:900;letter-spacing:.16em;color:#ff9fbd;padding-right:22px}
-.lm-conception-notice-title{margin:12px 20px 8px 0;font:700 22px/1.2 Georgia,serif;color:#fff1f5}
-.lm-conception-notice p{margin:0 0 12px;color:#e9dfe4;font-size:13px;line-height:1.55}
-.lm-conception-notice small{display:block;padding-top:10px;border-top:1px solid rgba(243,109,155,.18);font-size:10px;line-height:1.4;color:#b9aab1}
-.lm-conception-notice-close{position:absolute;right:10px;top:9px;width:28px;height:28px;border:1px solid rgba(255,255,255,.12);border-radius:9px;background:rgba(255,255,255,.05);color:#f7dbe4;font-size:20px;line-height:1;cursor:pointer}
-@keyframes lm-conception-in{from{opacity:0;transform:translateY(-10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
-@media(max-width:600px){.lm-conception-notice{right:10px;top:10px;width:calc(100vw - 20px);padding:17px}.lm-conception-notice-title{font-size:20px}}
+.lm-conception-notice{position:fixed;right:12px;top:max(10px,env(safe-area-inset-top));z-index:2147483647;width:min(282px,calc(100vw - 20px));box-sizing:border-box;padding:11px 12px 10px;border:1px solid rgba(243,109,155,.48);border-radius:14px;background:radial-gradient(ellipse at 100% 0,rgba(141,39,72,.28),transparent 58%),linear-gradient(145deg,rgba(14,27,30,.98),rgba(5,13,15,.985));color:#f7eeee;box-shadow:0 8px 28px rgba(0,0,0,.42),0 0 14px rgba(243,109,155,.1);font-family:Inter,system-ui,sans-serif;animation:lm-conception-in .28s ease-out both;backdrop-filter:blur(12px)}
+.lm-conception-notice-row{display:flex;align-items:flex-start;gap:9px;padding-right:20px}
+.lm-conception-notice-icon{display:grid;place-items:center;flex:0 0 27px;width:27px;height:27px;border-radius:9px;background:rgba(243,109,155,.12);border:1px solid rgba(243,109,155,.25);font-size:17px;color:#ffb4ca}
+.lm-conception-notice-copy{min-width:0;flex:1}
+.lm-conception-notice-kicker{font-size:8px;font-weight:850;letter-spacing:.12em;color:#ff9fbd;padding-right:0;margin:0 0 3px}
+.lm-conception-notice-title{margin:0 0 4px;font:700 15px/1.2 Georgia,serif;color:#fff1f5}
+.lm-conception-notice p{margin:0;color:#e9dfe4;font-size:11px;line-height:1.4}
+.lm-conception-notice-close{position:absolute;right:6px;top:6px;width:22px;height:22px;border:1px solid rgba(255,255,255,.12);border-radius:7px;background:rgba(255,255,255,.05);color:#f7dbe4;font-size:17px;line-height:1;cursor:pointer}
+.lm-pregnancy-tracker{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
+.lm-pregnancy-tracker>div{min-width:0;padding:11px 12px;border:1px solid rgba(243,109,155,.22);border-radius:12px;background:rgba(141,39,72,.08)}
+.lm-pregnancy-tracker small{display:block;font-size:9px;letter-spacing:.07em;color:var(--SmartThemeQuoteColor,#d9a4b6);font-weight:800}
+.lm-pregnancy-tracker strong{display:block;margin:5px 0;font-size:16px;line-height:1.25;overflow-wrap:anywhere}
+.lm-pregnancy-tracker span{display:block;font-size:11px;line-height:1.35;opacity:.8}
+@keyframes lm-conception-in{from{opacity:0;transform:translateY(-6px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:600px){.lm-conception-notice{right:8px;top:max(8px,env(safe-area-inset-top));width:min(260px,calc(100vw - 16px));padding:10px;border-radius:12px}.lm-conception-notice-title{font-size:14px}.lm-conception-notice p{font-size:10.5px}.lm-pregnancy-tracker{grid-template-columns:minmax(0,1fr);gap:7px}.lm-pregnancy-tracker>div{padding:10px}}
