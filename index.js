@@ -716,25 +716,28 @@ function detectCycleCandidates(text,messageIndex){
  const hash=`${chatKey()}:${messageIndex}:${cycleTextHash(normalized)}`;
  const c=getCycleState();
  const rules=[
-  {type:'period',re:/(?:начал(?:ась|ся|ись) менструац|пошл[аи] месячн|кровотечен.{0,35}(?:менстру|месячн)|period started|started (?:her|my) period|menstruation began|menstrual bleeding)/i,label:'В тексте обнаружено возможное начало менструации'},
-  {type:'contraception',re:/(?:презерватив|контрацепц|противозачаточ|таблетк.{0,25}(?:от беременности|контрацеп)|экстренн.{0,20}контрацеп|condom|contraception|birth control|morning.after pill)/i,label:'В тексте упоминается контрацепция'},
-  {type:'contact',re:/(?:занима(?:лись|ется|ются) сексом|секс.{0,25}(?:без презерватива|без защиты|защитой)|половой акт|проникновен.{0,30}(?:влагалищ|вагин)|кончил.{0,35}(?:внутр|в неё|в нее|внутри)|эякуляц|незащищенн.{0,25}(?:секс|акт)|unprotected sex|had sex|sexual intercourse|ejaculat.{0,30}(?:inside|in her)|came inside)/i,label:'В тексте обнаружен возможный сексуальный контакт'},
-  {type:'symptom',re:/(?:тошнот|утренн.{0,15}тошнот|бол.{0,15}груд.{0,20}(?:цикл|менстру|набух)|спазм.{0,20}(?:живот|матк)|тянущ.{0,20}низ живота|pregnancy symptoms|morning sickness|nausea|tender breasts|abdominal cramps)/i,label:'В тексте упоминается возможный симптом'},
-  {type:'test',re:/(?:тест.{0,25}(?:на беременность|показал|отрицательн|положительн)|беременност.{0,20}тест|pregnancy test|tested positive|tested negative)/i,label:'В тексте упоминается тест на беременность'},
-  {type:'pregnancy',re:/(?:оказал.{0,20}беремен|подтвердил.{0,20}беремен|беременна|беременен|беременность подтвержден|pregnant|pregnancy confirmed|positive pregnancy test)/i,label:'В тексте есть прямое упоминание беременности'}
+  {type:'period',re:/(?:начал(?:ась|ся|ись) менструац|пошл[аи] месячн|кровотечен.{0,35}(?:менстру|месячн)|period started|started (?:her|my) period|menstruation began|menstrual bleeding)/i,label:'Возможное начало менструации'},
+  {type:'contraception',re:/(?:презерватив|контрацепц|противозачаточ|таблетк.{0,25}(?:от беременности|контрац)|экстренн.{0,20}контрацеп|condom|contraception|birth control|morning.after pill|pull(?:ed)? out|withdrawal method)/i,label:'Упоминание контрацепции'},
+  // Pregnancy-capable contact: broad wording, but conception is separately gated below.
+  {type:'contact',re:/(?:вагинальн.{0,20}(?:секс|проникновен|половой акт)|пенис.{0,30}(?:влагалищ|внутрь|внутри)|член.{0,30}(?:влагалищ|внутрь|внутри)|проник.{0,35}(?:влагалищ|вагин|внутрь|внутри)|вош[её]л.{0,25}(?:в неё|в нее|влагалищ|внутрь)|занима(?:лись|ется|ются) сексом|половой акт|секс.{0,30}(?:без презерватива|без защиты|с презервативом)|кончил.{0,40}(?:внутр|в неё|в нее|внутри)|эякуляц|сперма.{0,30}(?:влагалищ|внутри|в неё|в нее)|незащищенн.{0,25}(?:секс|акт)|unprotected sex|had sex|sexual intercourse|vaginal (?:sex|penetration|intercourse)|penis.{0,30}(?:vagina|inside her)|penetrat.{0,30}(?:vagina|her)|ejaculat.{0,30}(?:inside|in her)|came inside|cum(?:med|ming)? inside)/i,label:'Возможный сексуальный контакт'},
+  // Other intimate acts are recorded but never trigger a conception roll by themselves.
+  {type:'other',re:/(?:анальн.{0,20}(?:секс|проникновен|половой акт)|в анус|в задн.{0,15}(?:проник|вош|встав)|анальн|anal sex|anal penetration|into (?:her )?ass|into (?:her )?anus|penetrat.{0,25}anus|минет|оральн.{0,20}(?:секс|ласк|контакт)|отсосал[а]?|взял[а]?\s+(?:его\s+)?(?:член|в\s+рот)|кунилингус|ласкал[а]?\s+(?:его\s+)?(?:член|ротом)|лизал[а]?\s+(?:е[её]\s+)?(?:киск|вульв|член)|blowjob|oral sex|went down on|gave him head|sucked (?:his )?(?:cock|dick)|cunnilingus|handjob|hand job|masturbat\w*|ручн.{0,20}(?:стимуляц|ласк)|ласкал[а]? руками|петтинг|fingering|fingered|frottage|dry humping|grinding|outercourse|mutual masturbation|ласкал[а]? клитор|стимулировал[а]? клитор)/i,label:'Интимная сцена (без автоматического расчёта зачатия)'},
+  {type:'symptom',re:/(?:тошнот|утренн.{0,15}тошнот|бол.{0,15}груд.{0,20}(?:цикл|менстру|набух)|спазм.{0,20}(?:живот|матк)|тянущ.{0,20}низ живота|pregnancy symptoms|morning sickness|nausea|tender breasts|abdominal cramps)/i,label:'Возможный симптом'},
+  {type:'test',re:/(?:тест.{0,25}(?:на беременность|показал|отрицательн|положительн)|беременност.{0,20}тест|pregnancy test|tested positive|tested negative)/i,label:'Тест на беременность'},
+  {type:'pregnancy',re:/(?:оказал.{0,20}беремен|подтвердил.{0,20}беремен|беременна|беременен|беременность подтвержден|pregnant|pregnancy confirmed|positive pregnancy test)/i,label:'Прямое упоминание беременности'}
  ];
  const matches=[];for(const rule of rules){const m=body.match(rule.re);if(!m)continue;const before=body.slice(Math.max(0,(m.index||0)-45),m.index||0);if(rule.type!=='contraception'&&rule.type!=='test'&&/(?:не|нет|без|не была|не был|не является|отрицательн|ложн|не беременн|not|never|no |without|isn't|is not|negative)/i.test(before))continue;matches.push({rule,match:m[0]});}
  if(!matches.length)return 0;
  const now=new Date(),today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;let added=0;
  for(const {rule,match} of matches){
   if(c.events.some(e=>e.source==='auto'&&e.sourceRef===hash&&e.type===rule.type))continue;
-  const at=body.toLocaleLowerCase().indexOf(match.toLocaleLowerCase()),excerpt=body.slice(Math.max(0,at-130),Math.min(body.length,at+match.length+170)).replace(/\s+/g,' ').trim(),autoContact=rule.type==='contact';
+  const at=body.toLocaleLowerCase().indexOf(match.toLocaleLowerCase()),excerpt=body.slice(Math.max(0,at-180),Math.min(body.length,at+match.length+220)).replace(/\s+/g,' ').trim(),autoContact=rule.type==='contact';
   // A single intimate scene often spans several consecutive RP replies. Merge contact
   // detections from nearby messages into one scene event, so it gets only one conception roll.
-  const recentContact=autoContact?c.events.filter(e=>e.source==='auto'&&e.type==='contact'&&e.status!=='rejected').map(e=>{
+  const recentContact=(autoContact||rule.type==='other')?c.events.filter(e=>e.source==='auto'&&['contact','other'].includes(e.type)&&e.status!=='rejected').map(e=>{
    let idx=Number(e.messageIndex);if(!Number.isFinite(idx)||idx<0){const m=String(e.sourceRef||'').match(/:(\d+):[a-z0-9]+$/i);idx=m?Number(m[1]):-1;}return {event:e,index:idx};
   }).filter(x=>x.index>=0&&messageIndex>=x.index&&messageIndex-x.index<=6).sort((a,b)=>b.index-a.index)[0]:null;
-  if(recentContact){
+  if(recentContact && (recentContact.event.type===rule.type || (autoContact && recentContact.event.type==='contact'))){
    const event=recentContact.event;event.messageIndex=messageIndex;event.sourceRef=hash;event.updatedAt=Date.now();
    const addendum=`Продолжение той же сцены (сообщение ${messageIndex+1}): «${excerpt.slice(0,240)}».`;
    if(!event.description.includes(addendum))event.description=(event.description+' '+addendum).slice(0,2000);
@@ -783,6 +786,10 @@ function markPregnancyFromConception(c,event){
 function calculateConceptionForEvent(c,event){
  if(event.conceptionChecked)return event.conceptionResult||'skipped';event.conceptionChecked=true;
  if(event.type!=='contact'){event.conceptionResult='skipped';event.conceptionReason='Не является событием полового контакта.';return 'skipped';}
+ const routeText=String(event.description||'').toLocaleLowerCase().replace(/[ё]/g,'е');
+ const vaginalRoute=/(?:вагинальн|влагалищ|пенис.{0,35}(?:внутр|влагалищ|vagina)|член.{0,35}(?:внутр|влагалищ)|проник.{0,35}(?:влагалищ|вагин)|эякуляц.{0,35}(?:внутр|влагалищ)|сперма.{0,35}(?:влагалищ|внутр)|кончил.{0,35}(?:внутр|в нее|в неё)|came inside|cum(?:med|ming)? inside|ejaculat.{0,35}(?:inside|vagina)|vaginal (?:sex|penetration|intercourse))/i.test(routeText);
+ const onlyNonVaginal=/(?:анальн.{0,20}(?:секс|проникновен)|анус|oral sex|blowjob|минет|кунилингус|handjob|masturbat|fingering|anal penetration|into (?:her )?(?:ass|anus))/i.test(routeText) && !vaginalRoute;
+ if(!vaginalRoute || onlyNonVaginal){event.conceptionResult='skipped';event.conceptionReason='Не обнаружен явный путь попадания спермы во влагалище; автоматический расчёт зачатия пропущен.';return 'skipped';}
  if(c.pregnancyStatus==='confirmed'&&c.pregnancyConfirmed){event.conceptionResult='skipped';event.conceptionReason='Беременность уже отмечена как подтверждённая; повторная проверка не выполнялась.';return 'skipped';}
  const text=String(event.description||'').toLocaleLowerCase().replace(/[ё]/g,'е'),notes=String(c.contraceptionNotes||'').toLocaleLowerCase().replace(/[ё]/g,'е');
  const failure=/(?:порвал(?:ся|ась|ся)|лопнул|повредил(?:ся|ась)|соскользнул|пропустил.{0,20}таблет|забыл.{0,20}таблет|сбой.{0,20}контрац|не сработал|missed pill|condom (?:broke|split|tore|slipped)|contraception failed|birth control failed)/i.test(text);
@@ -1302,7 +1309,7 @@ function bind(){
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.4.40</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['cycle','🌙 Цикл'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.4.43</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['cycle','🌙 Цикл'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
  document.querySelector('#lmClose').onclick=()=>{editorId=null;document.querySelector('#lmOverlay').classList.add('hidden');syncFab();};
  const overlay=document.querySelector('#lmOverlay');
  if(overlay&&!overlay.dataset.lovemedDelegated){
