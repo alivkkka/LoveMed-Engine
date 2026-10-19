@@ -710,48 +710,80 @@ function cycleSummary(c=getCycleState()){
 }
 function cycleTextHash(text){let h=2166136261;for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(36);}
 function detectCycleCandidates(text,messageIndex){
- const body=String(text||'').replace(/\[\[LOVEMED_STATE\]\][\s\S]*?\[\[\/LOVEMED_STATE\]\]/g,' ').trim();
+ // Use a rolling window of the latest four character replies as scene context.
+ // This remains local/offline: it is contextual rule-based classification, not an external LLM call.
+ const c=ctx();const chat=Array.isArray(c?.chat)?c.chat:[];
+ const recent=chat.map((m,i)=>({m,i})).filter(x=>!x.m.is_user&&typeof x.m.mes==='string'&&x.i<=messageIndex).slice(-4);
+ const contextText=recent.map(x=>x.m.mes).join('\n');
+ const body=String(contextText||text||'').replace(/\[\[LOVEMED_STATE\]\][\s\S]*?\[\[\/LOVEMED_STATE\]\]/g,' ').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
  if(body.length<30)return 0;
  const normalized=body.toLocaleLowerCase().replace(/[ё]/g,'е');
  const hash=`${chatKey()}:${messageIndex}:${cycleTextHash(normalized)}`;
- const c=getCycleState();
+ const state=getCycleState();
  const rules=[
-  {type:'period',re:/(?:начал(?:ась|ся|ись) менструац|пошл[аи] месячн|кровотечен.{0,35}(?:менстру|месячн)|period started|started (?:her|my) period|menstruation began|menstrual bleeding)/i,label:'Возможное начало менструации'},
-  {type:'contraception',re:/(?:презерватив|контрацепц|противозачаточ|таблетк.{0,25}(?:от беременности|контрац)|экстренн.{0,20}контрацеп|condom|contraception|birth control|morning.after pill|pull(?:ed)? out|withdrawal method)/i,label:'Упоминание контрацепции'},
-  // Pregnancy-capable contact: broad wording, but conception is separately gated below.
-  {type:'contact',re:/(?:вагинальн.{0,20}(?:секс|проникновен|половой акт)|пенис.{0,30}(?:влагалищ|внутрь|внутри)|член.{0,30}(?:влагалищ|внутрь|внутри)|проник.{0,35}(?:влагалищ|вагин|внутрь|внутри)|вош[её]л.{0,25}(?:в неё|в нее|влагалищ|внутрь)|занима(?:лись|ется|ются) сексом|половой акт|секс.{0,30}(?:без презерватива|без защиты|с презервативом)|кончил.{0,40}(?:внутр|в неё|в нее|внутри)|эякуляц|сперма.{0,30}(?:влагалищ|внутри|в неё|в нее)|незащищенн.{0,25}(?:секс|акт)|unprotected sex|had sex|sexual intercourse|vaginal (?:sex|penetration|intercourse)|penis.{0,30}(?:vagina|inside her)|penetrat.{0,30}(?:vagina|her)|ejaculat.{0,30}(?:inside|in her)|came inside|cum(?:med|ming)? inside)/i,label:'Возможный сексуальный контакт'},
-  // Other intimate acts are recorded but never trigger a conception roll by themselves.
-  {type:'other',re:/(?:анальн.{0,20}(?:секс|проникновен|половой акт)|в анус|в задн.{0,15}(?:проник|вош|встав)|анальн|anal sex|anal penetration|into (?:her )?ass|into (?:her )?anus|penetrat.{0,25}anus|минет|оральн.{0,20}(?:секс|ласк|контакт)|отсосал[а]?|взял[а]?\s+(?:его\s+)?(?:член|в\s+рот)|кунилингус|ласкал[а]?\s+(?:его\s+)?(?:член|ротом)|лизал[а]?\s+(?:е[её]\s+)?(?:киск|вульв|член)|blowjob|oral sex|went down on|gave him head|sucked (?:his )?(?:cock|dick)|cunnilingus|handjob|hand job|masturbat\w*|ручн.{0,20}(?:стимуляц|ласк)|ласкал[а]? руками|петтинг|fingering|fingered|frottage|dry humping|grinding|outercourse|mutual masturbation|ласкал[а]? клитор|стимулировал[а]? клитор)/i,label:'Интимная сцена (без автоматического расчёта зачатия)'},
+  {type:'period',re:/(?:начал(?:ась|ся|ись) менструац|пошл[аи] месячн|кровотечен.{0,35}(?:менстру|месячн)|period started|started (?:her|my) period|menstruation began|menstrual bleeding)/i,label:'Начало менструации'},
+  {type:'contraception',re:/(?:презерватив|контрацепц|противозачаточ|таблетк.{0,25}(?:от беременности|контрац)|экстренн.{0,20}контрацеп|condom|contraception|birth control|morning.after pill|pull(?:ed)? out|withdrawal method)/i,label:'Использование или упоминание контрацепции'},
+  {type:'contact',re:/(?:вагинальн.{0,20}(?:секс|проникновен|половой акт)|пенис.{0,30}(?:влагалищ|внутрь|внутри)|член.{0,30}(?:влагалищ|внутрь|внутри)|проник.{0,35}(?:влагалищ|вагин|внутрь|внутри)|вош[её]л.{0,25}(?:в неё|в нее|влагалищ|внутрь)|занима(?:лись|ется|ются) сексом|половой акт|незащищенн.{0,25}(?:секс|акт)|unprotected sex|had sex|sexual intercourse|vaginal (?:sex|penetration|intercourse)|penis.{0,30}(?:vagina|inside her)|penetrat.{0,30}(?:vagina|her)|ejaculat.{0,30}(?:inside|in her)|came inside|cum(?:med|ming)? inside)/i,label:'Половой контакт (тип требует уточнения)'},
+  {type:'other',re:/(?:анальн.{0,20}(?:секс|проникновен|половой акт)|в анус|в задн.{0,15}(?:проник|вош|встав)|анальн|anal sex|anal penetration|into (?:her )?ass|into (?:her )?anus|penetrat.{0,25}anus)/i,label:'Анальный контакт'},
+  {type:'other',re:/(?:минет|оральн.{0,20}(?:секс|ласк|контакт)|отсосал[а]?|взял[а]?\s+(?:его\s+)?(?:член|в\s+рот)|кунилингус|ласкал[а]?\s+(?:его\s+)?(?:член|ротом)|лизал[а]?\s+(?:е[её]\s+)?(?:киск|вульв|член)|blowjob|oral sex|went down on|gave him head|sucked (?:his )?(?:cock|dick)|cunnilingus)/i,label:'Оральный контакт'},
+  {type:'other',re:/(?:handjob|hand job|masturbat\w*|ручн.{0,20}(?:стимуляц|ласк)|ласкал[а]? руками|петтинг|fingering|fingered|frottage|dry humping|grinding|outercourse|mutual masturbation|ласкал[а]? клитор|стимулировал[а]? клитор)/i,label:'Другой интимный контакт'},
   {type:'symptom',re:/(?:тошнот|утренн.{0,15}тошнот|бол.{0,15}груд.{0,20}(?:цикл|менстру|набух)|спазм.{0,20}(?:живот|матк)|тянущ.{0,20}низ живота|pregnancy symptoms|morning sickness|nausea|tender breasts|abdominal cramps)/i,label:'Возможный симптом'},
   {type:'test',re:/(?:тест.{0,25}(?:на беременность|показал|отрицательн|положительн)|беременност.{0,20}тест|pregnancy test|tested positive|tested negative)/i,label:'Тест на беременность'},
-  {type:'pregnancy',re:/(?:оказал.{0,20}беремен|подтвердил.{0,20}беремен|беременна|беременен|беременность подтвержден|pregnant|pregnancy confirmed|positive pregnancy test)/i,label:'Прямое упоминание беременности'}
+  {type:'pregnancy',re:/(?:оказал.{0,20}беремен|подтвердил.{0,20}беремен|беременна|беременен|беременность подтвержден|pregnant|pregnancy confirmed|positive pregnancy test)/i,label:'Беременность упомянута прямо'}
  ];
- const matches=[];for(const rule of rules){const m=body.match(rule.re);if(!m)continue;const before=body.slice(Math.max(0,(m.index||0)-45),m.index||0);if(rule.type!=='contraception'&&rule.type!=='test'&&/(?:не|нет|без|не была|не был|не является|отрицательн|ложн|не беременн|not|never|no |without|isn't|is not|negative)/i.test(before))continue;matches.push({rule,match:m[0]});}
+ const matches=[];
+ for(const rule of rules){const m=body.match(rule.re);if(!m)continue;const before=body.slice(Math.max(0,(m.index||0)-60),m.index||0);if(rule.type!=='contraception'&&rule.type!=='test'&&/(?:не|нет|без|не была|не был|не является|отрицательн|ложн|не беременн|not|never|no |without|isn't|is not|negative)/i.test(before))continue;matches.push({rule,match:m[0]});}
  if(!matches.length)return 0;
- const now=new Date(),today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;let added=0;
- for(const {rule,match} of matches){
-  if(c.events.some(e=>e.source==='auto'&&e.sourceRef===hash&&e.type===rule.type))continue;
-  const at=body.toLocaleLowerCase().indexOf(match.toLocaleLowerCase()),excerpt=body.slice(Math.max(0,at-180),Math.min(body.length,at+match.length+220)).replace(/\s+/g,' ').trim(),autoContact=rule.type==='contact';
-  // A single intimate scene often spans several consecutive RP replies. Merge contact
-  // detections from nearby messages into one scene event, so it gets only one conception roll.
-  const recentContact=(autoContact||rule.type==='other')?c.events.filter(e=>e.source==='auto'&&['contact','other'].includes(e.type)&&e.status!=='rejected').map(e=>{
-   let idx=Number(e.messageIndex);if(!Number.isFinite(idx)||idx<0){const m=String(e.sourceRef||'').match(/:(\d+):[a-z0-9]+$/i);idx=m?Number(m[1]):-1;}return {event:e,index:idx};
-  }).filter(x=>x.index>=0&&messageIndex>=x.index&&messageIndex-x.index<=6).sort((a,b)=>b.index-a.index)[0]:null;
-  if(recentContact && (recentContact.event.type===rule.type || (autoContact && recentContact.event.type==='contact'))){
-   const event=recentContact.event;event.messageIndex=messageIndex;event.sourceRef=hash;event.updatedAt=Date.now();
-   const addendum=`Продолжение той же сцены (сообщение ${messageIndex+1}): «${excerpt.slice(0,240)}».`;
-   if(!event.description.includes(addendum))event.description=(event.description+' '+addendum).slice(0,2000);
-   // Do not run another conception roll for the same multi-message scene.
+ // Prioritize the most specific sexual route; never create separate oral/anal/vaginal rows from one scene.
+ const sexual=matches.filter(x=>['contact','other'].includes(x.rule.type)).sort((a,b)=>{const rank=x=>/(?:вагинальн|влагалищ|vaginal|vagina|пенис.{0,30}(?:влагалищ|внутрь)|член.{0,30}(?:влагалищ|внутрь)|came inside|cum(?:med|ming)? inside|эякуляц)/i.test(x.match)?4:/(?:анальн|анус|anal sex|anal penetration|anus)/i.test(x.match)?3:/(?:минет|оральн|blowjob|oral sex|went down|gave him head|sucked|cunnilingus|кунилингус)/i.test(x.match)?2:1;return rank(b)-rank(a);})[0];
+ const selected=sexual?[sexual]:matches.filter(x=>!['contact','other'].includes(x.rule.type)).slice(0,1);
+ const lower=normalized;
+ const place=/\b(?:in the car|inside the car|car seat|backseat|passenger seat|машин[еыу]|салон(?:е|а)? автомобил|на заднем сиденье)\b/i.test(lower)?'в машине':/\b(?:bedroom|bed|on the bed|спальн|кроват)\b/i.test(lower)?'в спальне':/\b(?:shower|bathroom|душевая|ванн(?:ой|е)|в ванной)\b/i.test(lower)?'в ванной': '';
+ const now=new Date(),today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+ let added=0;
+ for(const {rule} of selected){
+  // If an active scene record exists in the last four character replies, update that record instead of creating another.
+  const recentEvent=state.events.filter(e=>e.source==='auto'&&e.status!=='rejected'&&['contact','other'].includes(e.type)&&Number.isFinite(Number(e.messageIndex))&&messageIndex>=Number(e.messageIndex)&&messageIndex-Number(e.messageIndex)<=8).sort((a,b)=>Number(b.messageIndex)-Number(a.messageIndex))[0];
+  if(recentEvent&&['contact','other'].includes(rule.type)){
+   recentEvent.messageIndex=messageIndex;recentEvent.sourceRef=hash;recentEvent.updatedAt=Date.now();
+   // Upgrade vague type/description when the larger context gives a more precise route.
+   const canonical=rule.label+(place?` ${place}`:'');
+   if(!recentEvent.description.includes(canonical))recentEvent.description=canonical+'. '+recentEvent.description.replace(/^.*?\./,'').trim().slice(0,500);
    added++;continue;
   }
-  const description=`${rule.label}. Фрагмент сцены: «${excerpt.slice(0,420)}». ${autoContact?'Событие автоматически обработано игровой системой.':'Проверь контекст перед подтверждением.'}`;
-  const event=normalizeCycleEvent({id:uid(),date:today,type:rule.type,description,status:autoContact?'confirmed':'pending',source:'auto',sourceRef:hash,messageIndex});c.events.push(event);
-  if(autoContact)calculateConceptionForEvent(c,event);
+  if(state.events.some(e=>e.source==='auto'&&e.sourceRef===hash&&e.type===rule.type))continue;
+  const isSex=['contact','other'].includes(rule.type);
+  const explicitVaginal=rule.type==='contact'&&/(?:вагинальн|влагалищ|vaginal|vagina|penis.{0,30}(?:vagina|inside her)|проник.{0,35}(?:влагалищ|вагин)|член.{0,30}(?:влагалищ|внутрь)|пенис.{0,30}(?:влагалищ|внутрь)|came inside|cum(?:med|ming)? inside|эякуляц.{0,35}(?:внутр|влагалищ)|сперм.{0,30}(?:внутри|влагалищ|в нее|в неё))/i.test(lower);
+  let description=(explicitVaginal?'Вагинальный половой контакт':rule.label)+(place?` ${place}`:'');
+  if(isSex){
+   description+=explicitVaginal?'. Возможность зачатия оценивается отдельно по контексту и настройкам.':'. По имеющемуся контексту путь зачатия не подтверждён; автоматический расчёт пропущен.';
+  }
+  const event=normalizeCycleEvent({id:uid(),date:today,type:rule.type,description,status:isSex?'confirmed':'pending',source:'auto',sourceRef:hash,messageIndex});
+  state.events.push(event);
+  if(isSex&&rule.type==='contact')calculateConceptionForEvent(state,event);
   added++;
  }
- if(added){c.events=c.events.slice(-200);saveCycleState(c);armPendingConceptionNotice();const conceived=c.events.some(e=>e.sourceRef===hash&&e.type==='contact'&&e.conceptionResult==='pregnant');toast(`🌙 LoveMed: ${added===1?'найдено событие':`найдено событий: ${added}`} — ${conceived?'беременность отмечена автоматически при успешной проверке':'проверь журнал во вкладке «Цикл»'}`);} 
-
+ if(added){state.events=state.events.slice(-200);saveCycleState(state);armPendingConceptionNotice();toast(`🌙 LoveMed: ${added===1?'сцена обновлена или записана':'события обновлены'} — журнал «Цикл»`);}
  return added;
+}
+function editCycleEvent(id){
+ const c=getCycleState(),event=c.events.find(e=>e.id===id);if(!event)return;
+ const next=window.prompt('Измени описание события (только русский язык):',event.description);if(next===null)return;
+ const description=String(next).trim().slice(0,2000);if(!description){toast('Описание не может быть пустым');return;}
+ event.description=description;event.updatedAt=Date.now();saveCycleState(c);render();toast('Описание события изменено');
+}
+function mergeCycleEvents(){
+ const ids=[...document.querySelectorAll('[data-cycle-select]:checked')].map(x=>x.value);if(ids.length<2){toast('Выбери минимум две записи для объединения');return;}
+ const c=getCycleState(),items=ids.map(id=>c.events.find(e=>e.id===id)).filter(Boolean);if(items.length<2)return;
+ const primary=items.sort((a,b)=>Number(a.createdAt)-Number(b.createdAt))[0];
+ const unique=[];for(const item of items){const d=String(item.description||'').trim();if(d&&!unique.includes(d))unique.push(d);}
+ primary.description=unique.join(' / ').slice(0,2000);primary.date=items.map(e=>e.date).sort()[0]||primary.date;primary.updatedAt=Date.now();
+ if(items.some(e=>e.type==='contact'))primary.type='contact';
+ if(items.some(e=>e.status==='confirmed'))primary.status='confirmed';
+ const pregnant=items.find(e=>e.conceptionResult==='pregnant'),checked=items.find(e=>e.conceptionChecked);
+ if(pregnant){primary.conceptionResult=pregnant.conceptionResult;primary.conceptionChecked=true;primary.conceptionChance=pregnant.conceptionChance;primary.conceptionReason=pregnant.conceptionReason;primary.conceptionNoticeDueAt=pregnant.conceptionNoticeDueAt;}
+ else if(checked){primary.conceptionChecked=true;primary.conceptionResult=checked.conceptionResult;primary.conceptionChance=checked.conceptionChance;primary.conceptionReason=checked.conceptionReason;}
+ const remove=new Set(items.filter(e=>e.id!==primary.id).map(e=>e.id));c.events=c.events.filter(e=>!remove.has(e.id));saveCycleState(c);render();toast(`Объединено записей: ${items.length} → 1`);
 }
 function showCycleTestNotice(){
  const prior=document.querySelector('.lm-conception-notice');prior?.remove();
@@ -823,7 +855,7 @@ function cyclePage(){
  const events=[...c.events].sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt-a.createdAt);
  return `<div class="lm-card lm-cycle-page"><section class="lm-section"><div class="lm-cycle-heading"><div><span class="lm-label">LOVEMED · PERSONAL HEALTH</span><h3>Цикл и беременность</h3><p class="lm-note">Отдельный журнал состояния {{user}}. Даты и фазы пока являются ориентировочными игровыми оценками.</p></div><span class="lm-cycle-mark">♡</span></div><div class="lm-cycle-summary"><article><small>ДЕНЬ ЦИКЛА</small><strong>${sum.day===null?'—':sum.day}</strong><span>${sum.phase==='Не определена'?'Задай начало цикла':esc(sum.phase)}</span></article><article><small>СЛЕДУЮЩАЯ МЕНСТРУАЦИЯ</small><strong>${sum.next==='—'?'—':esc(sum.next)}</strong><span>Предварительная оценка</span></article><article><small>БЕРЕМЕННОСТЬ</small><strong>${esc(statusLabels[c.pregnancyStatus]||statusLabels.unknown)}</strong><span>${c.pregnancyConfirmed?'Отмечена как подтверждённая в сюжете':'Игровой статус'}</span></article></div>${preg?`<div class="lm-pregnancy-tracker"><div><small>СРОК БЕРЕМЕННОСТИ</small><strong>${preg.weeks} нед. ${preg.days} дн.</strong><span>Отсчёт ведётся автоматически по дате зачатия</span></div><div><small>ПРИМЕРНАЯ ДАТА РОДОВ</small><strong>${esc(preg.dueDate||'—')}</strong><span>${preg.daysToDue===null?'Срок не рассчитан':preg.daysToDue>=0?`Около ${preg.daysToDue} дн. осталось`:`Расчётная дата прошла на ${Math.abs(preg.daysToDue)} дн.`}</span></div></div>`:''}</section>
  <section class="lm-section"><h3>Настройки цикла</h3><p class="lm-note">LoveMed замечает маркеры в новых ответах. Найденный половой контакт автоматически проходит один игровой бросок зачатия; остальные события появляются на проверку; учитываются заданный шанс, примерная фаза цикла и явные упоминания контрацепции. При успешном результате беременность сохраняется сразу, а компактное уведомление появляется с задержкой 20–90 секунд, когда панель LoveMed свёрнута. Срок и ориентировочная дата родов рассчитываются автоматически. Это игровая механика, не медицинский прогноз.</p><div class="lm-cycle-form"><label>Начало последней менструации<input id="lmCycleLastPeriod" type="date" value="${esc(c.lastPeriodStart)}"></label><label>Длина цикла (дней)<input id="lmCycleLength" type="number" min="20" max="45" value="${c.cycleLength}"></label><label>Длительность менструации (дней)<input id="lmCyclePeriodLength" type="number" min="2" max="10" value="${c.periodLength}"></label><label>Статус беременности<select id="lmCyclePregnancyStatus"><option value="unknown" ${c.pregnancyStatus==='unknown'?'selected':''}>Не определена</option><option value="not-pregnant" ${c.pregnancyStatus==='not-pregnant'?'selected':''}>Не подтверждена</option><option value="possible" ${c.pregnancyStatus==='possible'?'selected':''}>Возможна по игровым условиям</option><option value="pending-confirmation" ${c.pregnancyStatus==='pending-confirmation'?'selected':''}>Ожидает подтверждения</option><option value="confirmed" ${c.pregnancyStatus==='confirmed'?'selected':''}>Подтверждена в сюжете</option><option value="ended" ${c.pregnancyStatus==='ended'?'selected':''}>Завершена</option></select></label><label>Игровая вероятность (%)<input id="lmCyclePregnancyChance" type="number" min="0" max="90" value="${c.pregnancyChance}"></label><label class="lm-cycle-wide lm-cycle-notice-toggle"><input id="lmCycleNoticeEnabled" type="checkbox" ${c.conceptionNoticeEnabled!==false?'checked':''}> Показывать сюрприз-уведомление, если игровая проверка определит зачатие</label><label class="lm-cycle-wide">Контрацепция / правила текущего сюжета<textarea id="lmCycleContraception" rows="2" placeholder="Что используется, когда принято, известные пропуски…">${esc(c.contraceptionNotes)}</textarea></label><label class="lm-cycle-wide">Заметки<textarea id="lmCycleNotes" rows="2" placeholder="Особенности цикла, отклонения, сюжетные условия…">${esc(c.notes)}</textarea></label></div><button id="lmCycleSaveSettings" type="button" class="lm-primary">Сохранить настройки</button><button id="lmCycleTestNotice" type="button" class="lm-secondary lm-cycle-test-notice">♡ Проверить уведомление на экране</button><p class="lm-note lm-cycle-persistence-note">Состояние цикла и беременности сохраняется отдельно от переписки и суммари для этого чата. Сокращение истории не должно обнулять записанные события или повторно запускать старые проверки.</p></section>
- <section class="lm-section"><h3>Журнал событий · ${(c.events.filter(e=>e.status==='pending').length)} на проверке</h3><p class="lm-note">События, найденные автоматически, помечаются как «Распознано из РП». Подтверждай только то, что действительно произошло; отклонённые события не участвуют в дальнейших расчётах.</p><div class="lm-cycle-form lm-cycle-event-form"><label>Дата события<input id="lmCycleEventDate" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Тип<select id="lmCycleEventType">${Object.entries(typeLabels).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label><label class="lm-cycle-wide">Описание<textarea id="lmCycleEventDescription" rows="2" maxlength="2000" placeholder="Что произошло в РП? Не добавляй предположения, которых не было в тексте."></textarea></label></div><button id="lmCycleAddEvent" type="button" class="lm-primary">＋ Добавить событие</button><div class="lm-cycle-events">${events.map(e=>`<article class="lm-cycle-event"><div class="lm-cycle-event-top"><span>${esc(typeLabels[e.type]||typeLabels.other)}</span>${e.source==='auto'?'<span class="lm-cycle-source">Распознано из РП</span>':''}<time>${esc(e.date)}</time><span class="lm-cycle-status ${e.status}">${esc(statusText[e.status]||statusText.pending)}</span></div><p>${esc(e.description)}</p><div class="lm-cycle-event-actions">${e.status!=='confirmed'?`<button type="button" data-cycle-confirm="${esc(e.id)}" class="lm-secondary">Подтвердить</button>`:''}${e.status!=='rejected'?`<button type="button" data-cycle-reject="${esc(e.id)}" class="lm-secondary">Отклонить</button>`:''}<button type="button" data-cycle-delete="${esc(e.id)}" class="lm-cycle-delete">Удалить</button></div></article>`).join('')||'<div class="lm-cycle-empty">Пока нет событий. Когда в ответах персонажа встретятся маркеры цикла, контрацепции, контакта, симптомов или теста, они появятся здесь на проверку.</div>'}</div></section></div>`;
+ <section class="lm-section"><h3>Журнал событий · ${(c.events.filter(e=>e.status==='pending').length)} на проверке</h3><p class="lm-note">События, найденные автоматически, помечаются как «Распознано из РП». Подтверждай только то, что действительно произошло; отклонённые события не участвуют в дальнейших расчётах.</p><div class="lm-cycle-form lm-cycle-event-form"><label>Дата события<input id="lmCycleEventDate" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Тип<select id="lmCycleEventType">${Object.entries(typeLabels).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label><label class="lm-cycle-wide">Описание<textarea id="lmCycleEventDescription" rows="2" maxlength="2000" placeholder="Что произошло в РП? Не добавляй предположения, которых не было в тексте."></textarea></label></div><button id="lmCycleAddEvent" type="button" class="lm-primary">＋ Добавить событие</button><button id="lmCycleMergeEvents" type="button" class="lm-secondary">Объединить выбранные записи</button><div class="lm-cycle-events">${events.map(e=>`<article class="lm-cycle-event"><div class="lm-cycle-event-top"><label class="lm-cycle-select-label"><input type="checkbox" data-cycle-select value="${esc(e.id)}"> Объединить</label><span>${esc(typeLabels[e.type]||typeLabels.other)}</span>${e.source==='auto'?'<span class="lm-cycle-source">Распознано из РП</span>':''}<time>${esc(e.date)}</time><span class="lm-cycle-status ${e.status}">${esc(statusText[e.status]||statusText.pending)}</span></div><p>${esc(e.description)}</p><div class="lm-cycle-event-actions">${e.status!=='confirmed'?`<button type="button" data-cycle-confirm="${esc(e.id)}" class="lm-secondary">Подтвердить</button>`:''}${e.status!=='rejected'?`<button type="button" data-cycle-reject="${esc(e.id)}" class="lm-secondary">Отклонить</button>`:''}<button type="button" data-cycle-edit="${esc(e.id)}" class="lm-secondary">Изменить</button><button type="button" data-cycle-delete="${esc(e.id)}" class="lm-cycle-delete">Удалить</button></div></article>`).join('')||'<div class="lm-cycle-empty">Пока нет событий. Когда в ответах персонажа встретятся маркеры цикла, контрацепции, контакта, симптомов или теста, они появятся здесь на проверку.</div>'}</div></section></div>`;
 }
 function charCardKey(member=null){
  const suffix=member&&ctx()?.groupId?`:${charMemberKey(member)}`:'';
@@ -1270,6 +1302,8 @@ function bind(){
  document.querySelector('#lmCycleSaveSettings')?.addEventListener('click',saveCycleSettings);
  document.querySelector('#lmCycleTestNotice')?.addEventListener('click',showCycleTestNotice);
  document.querySelector('#lmCycleAddEvent')?.addEventListener('click',addCycleEvent);
+ document.querySelector('#lmCycleMergeEvents')?.addEventListener('click',mergeCycleEvents);
+ document.querySelectorAll('[data-cycle-edit]').forEach(b=>b.addEventListener('click',()=>editCycleEvent(b.dataset.cycleEdit)));
  document.querySelectorAll('[data-cycle-confirm]').forEach(b=>b.addEventListener('click',()=>updateCycleEvent(b.dataset.cycleConfirm,'confirmed')));
  document.querySelectorAll('[data-cycle-reject]').forEach(b=>b.addEventListener('click',()=>updateCycleEvent(b.dataset.cycleReject,'rejected')));
  document.querySelectorAll('[data-cycle-delete]').forEach(b=>b.addEventListener('click',()=>deleteCycleEvent(b.dataset.cycleDelete)));
@@ -1309,7 +1343,7 @@ function bind(){
 
 function ensurePanel(){
  if(document.querySelector('#lmOverlay'))return;
- document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.4.43</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['cycle','🌙 Цикл'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
+ document.body.insertAdjacentHTML('beforeend',`<div id="lmOverlay" class="lm-overlay hidden"><section class="lm-panel"><header class="lm-head"><div><div class="lm-kicker">LOVEMED · MEDICAL RECORD v0.4.44</div><h2>Медицинская карта</h2><p>Наблюдение за динамикой отношений</p></div><button id="lmClose" class="lm-close">×</button></header><nav class="lm-tabs">${[['card','🩺 Карта пациента'],['user','👤 Моя карта'],['cycle','🌙 Цикл'],['react','🧪 Реактивность'],['contacts','👥 Контакты'],['history','📋 История'],['system','⚙ Служебное']].map(x=>`<button data-tab="${x[0]}">${x[1]}</button>`).join('')}</nav><main id="lmBody"></main></section></div>`);
  document.querySelector('#lmClose').onclick=()=>{editorId=null;document.querySelector('#lmOverlay').classList.add('hidden');syncFab();};
  const overlay=document.querySelector('#lmOverlay');
  if(overlay&&!overlay.dataset.lovemedDelegated){
