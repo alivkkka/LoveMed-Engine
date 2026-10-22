@@ -323,7 +323,7 @@ function charProfile(){
 function preferenceText(){
  const ch=charObject();if(!ch)return'';
  const chunks=[],seen=new WeakSet();
- const preferenceKey=/^(?:kinks?|fetishes?|kink[_ -]?preferences?|fetish[_ -]?preferences?|sexual[_ -]?preferences?|preferences)$/i;
+ const preferenceKey=/^(?:(?:sexual[_ -]?)?kinks?(?:[_ -]?(?:preferences?|fetishes?))?|fetishes?|kink[_ -]?preferences?|fetish[_ -]?preferences?|sexual[_ -]?preferences?|intimate[_ -]?preferences?|preferences)$/i;
  function walk(value,key='',depth=0){
   if(depth>8||value==null)return;
   if(typeof value==='string'){
@@ -337,7 +337,7 @@ function preferenceText(){
  walk(ch,'character');
  // Character cards commonly store everything in a long description. In that case,
  // accept only explicitly labelled preference sections, never arbitrary mentions elsewhere.
- const lines=cardText().split(/\r?\n/),labels=/^(?:[-*•#> ]*)?(?:kinks?|fetishes?|kink preferences?|fetish preferences?|sexual preferences?|intimate preferences?|preferences)\s*[:：=–—-]?\s*(.*)$/i;
+ const lines=cardText().split(/\r?\n/),labels=/^(?:[-*•> ]*)?(?:#{1,6}\s*)?(?:sexual\s+)?(?:kinks?(?:\s*\/\s*(?:preferences?|fetishes?))?|fetishes?|kink\s*preferences?|fetish\s*preferences?|sexual\s+preferences?|intimate\s+preferences?|preferences)\s*[:：=–—-]?\s*(.*)$/i;
  const boundary=/^(?:[-*•#> ]*)?(?:name|age|gender|sex|appearance|personality|character|personality traits|scenario|background|backstory|occupation|likes|dislikes|limits|boundaries|hard limits|soft limits|description|relationships|relationships?|speech|speech style|notes|example dialogue|first message|greeting|биография|внешность|характер|сценарий|возраст|имя|предпочтения пользователя|ограничения|границы|не любит|любит)\s*[:：=–—-]/i;
  let collecting=false;
  for(const rawLine of lines){
