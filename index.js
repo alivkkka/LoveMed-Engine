@@ -323,7 +323,7 @@ function charProfile(){
 function preferenceText(){
  const ch=charObject();if(!ch)return'';
  const chunks=[],seen=new WeakSet();
- const preferenceKey=/^(?:(?:sexual[_ -]?)?kinks?(?:[_ -]?(?:preferences?|fetishes?))?|fetishes?|kink[_ -]?preferences?|fetish[_ -]?preferences?|sexual[_ -]?preferences?|intimate[_ -]?preferences?|preferences)$/i;
+ const preferenceKey=/^(?:kinks?|fetishes?|kink[_ -]?preferences?|fetish[_ -]?preferences?|sexual[_ -]?preferences?|preferences)$/i;
  function walk(value,key='',depth=0){
   if(depth>8||value==null)return;
   if(typeof value==='string'){
@@ -337,7 +337,7 @@ function preferenceText(){
  walk(ch,'character');
  // Character cards commonly store everything in a long description. In that case,
  // accept only explicitly labelled preference sections, never arbitrary mentions elsewhere.
- const lines=cardText().split(/\r?\n/),labels=/^(?:[-*•> ]*)?(?:#{1,6}\s*)?(?:sexual\s+)?(?:kinks?(?:\s*\/\s*(?:preferences?|fetishes?))?|fetishes?|kink\s*preferences?|fetish\s*preferences?|sexual\s+preferences?|intimate\s+preferences?|preferences)\s*[:：=–—-]?\s*(.*)$/i;
+ const lines=cardText().split(/\r?\n/),labels=/^(?:[-*•#> ]*)?(?:kinks?|fetishes?|kink preferences?|fetish preferences?|sexual preferences?|intimate preferences?|preferences)\s*[:：=–—-]?\s*(.*)$/i;
  const boundary=/^(?:[-*•#> ]*)?(?:name|age|gender|sex|appearance|personality|character|personality traits|scenario|background|backstory|occupation|likes|dislikes|limits|boundaries|hard limits|soft limits|description|relationships|relationships?|speech|speech style|notes|example dialogue|first message|greeting|биография|внешность|характер|сценарий|возраст|имя|предпочтения пользователя|ограничения|границы|не любит|любит)\s*[:：=–—-]/i;
  let collecting=false;
  for(const rawLine of lines){
@@ -666,9 +666,28 @@ function toast(t){const e=document.createElement('div');e.className='lm-toast';e
 function ui(){try{const u=Object.assign({showFab:true,x:null,y:120,tab:'card'},JSON.parse(localStorage.getItem(UI_KEY)||'{}'));if(u.tab==='diag')u.tab='user';return u;}catch{return{showFab:true,x:null,y:120,tab:'card'};}}
 function saveUI(x){try{localStorage.setItem(UI_KEY,JSON.stringify(x));}catch{}}
 const userCardDefaults=()=>({name:'',age:'',sex:'',gender:'',secondarySex:'',avatar:'',cycleHistory:'',ovulation:'',menstruation:'',pregnancy:'',children:'',notes:'',rpObservation:'',pregnancyChance:25,pregnancyCheckAt:0,pregnancyResult:'',pregnancyCheckedLength:0,pregnancyCheckedTail:'',updatedAt:0});
-function userCardKey(){return `lovemed_user_card:${chatKey()}`;}
-function getUserCard(){try{return Object.assign(userCardDefaults(),JSON.parse(localStorage.getItem(userCardKey())||'{}'));}catch{return userCardDefaults();}}
-function saveUserCard(data){const x=Object.assign(userCardDefaults(),data||{},{updatedAt:Date.now()});try{localStorage.setItem(userCardKey(),JSON.stringify(x));}catch{}return x;}
+// The user's profile belongs to the character (or group), not to an individual chat thread.
+// This keeps the same character's user card when switching between that character's chats.
+function userCardScopeKey(){
+ const c=ctx();
+ if(c.groupId!==undefined&&c.groupId!==null&&String(c.groupId)!=='')return `group-${String(c.groupId)}`;
+ if(c.characterId!==undefined&&c.characterId!==null&&String(c.characterId)!=='')return `char-${String(c.characterId)}`;
+ return `chat-${chatKey()}`;
+}
+function userCardKey(){return `lovemed_user_card_v3:${userCardScopeKey()}`;}
+function getUserCard(){
+ const key=userCardKey();
+ try{
+  const saved=localStorage.getItem(key);
+  if(saved)return Object.assign(userCardDefaults(),JSON.parse(saved));
+  // One-time migration from the previous per-chat key, so existing cards are not discarded.
+  const legacyKey=`lovemed_user_card:${chatKey()}`;
+  const legacy=localStorage.getItem(legacyKey);
+  if(legacy){const migrated=Object.assign(userCardDefaults(),JSON.parse(legacy));localStorage.setItem(key,JSON.stringify(migrated));return migrated;}
+ }catch{}
+ return userCardDefaults();
+}
+function saveUserCard(data){const x=Object.assign(userCardDefaults(),data||{},{updatedAt:Date.now()});try{localStorage.setItem(userCardKey(),JSON.stringify(x));}catch{toast('Не удалось сохранить карточку пользователя: хранилище недоступно');}return x;}
 
 /* ---------- Cycle & pregnancy module: chat-scoped, isolated from existing cards ---------- */
 const cycleDefaults=()=>({schemaVersion:3,lastPeriodStart:'',cycleLength:28,periodLength:5,pregnancyStatus:'unknown',pregnancyConfirmed:false,pregnancyChance:25,conceptionNoticeEnabled:true,conceptionDate:'',estimatedDueDate:'',pregnancyOriginEventId:'',contraceptionNotes:'',notes:'',events:[],updatedAt:0});
@@ -1040,7 +1059,7 @@ function userCardPage(){
    <div class="lm-idcard-spark lm-spark-1">✦</div><div class="lm-idcard-spark lm-spark-2">✧</div>
    ${idCardHeader('user','PERSONAL MEDICAL ID · {{user}}')}
    <div class="lm-idcard-main">
-    <button type="button" class="lm-idcard-photo lm-user-avatar-picker" data-user-avatar-picker title="Нажмите, чтобы выбрать аватар">${av?`<img src="${esc(av)}" alt="">`:'<span>♡<small>нажмите для аватара</small></span>'}</button><input id="lmUserAvatarFile" type="file" accept="image/*" hidden>
+    <button type="button" class="lm-idcard-photo lm-user-avatar-picker" data-user-avatar-picker title="Нажмите, чтобы выбрать аватар">${av?`<img src="${esc(av)}" alt="">`:'<span>♡<small>нажмите для аватара</small></span>'}</button><input id="lmUserAvatarFile" class="lm-user-avatar-file" type="file" accept="image/*" aria-label="Выбрать изображение из галереи">
     <div class="lm-idcard-fields">
       ${idField('ИМЯ',u.name||'{{user}}')}
       ${idField('ВОЗРАСТ',u.age)}
@@ -1081,7 +1100,8 @@ function bindUserCard(){
   if(!btn)return;
   if(btn.matches('[data-user-avatar-picker]')){
    e.preventDefault();e.stopPropagation();
-   document.querySelector('#lmUserAvatarFile')?.click();
+   const picker=document.querySelector('#lmUserAvatarFile');
+   if(picker){try{if(typeof picker.showPicker==='function')picker.showPicker();else picker.click();}catch{picker.click();}}
    return;
   }
   e.preventDefault();e.stopPropagation();
