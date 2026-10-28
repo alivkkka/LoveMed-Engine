@@ -841,3 +841,15 @@
 
 /* Keep the file picker available to mobile browsers while visually hiding it. */
 .lm-user-avatar-file{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;opacity:0!important;pointer-events:none!important}
+
+
+/* v0.4.48 mobile containment, RP scanner controls, and compact contact tools */
+.lm-toast{left:8px!important;right:8px!important;bottom:max(12px,env(safe-area-inset-bottom))!important;transform:none!important;width:auto!important;max-width:calc(100vw - 16px)!important;box-sizing:border-box!important;text-align:center;white-space:normal!important;overflow-wrap:anywhere;word-break:normal;line-height:1.35;font-size:12px!important;padding:10px 12px!important;border-radius:14px!important}
+.lm-cycle-range{padding:12px;margin:10px 0 14px;border:1px solid var(--lm-line);border-radius:15px;background:rgba(5,14,16,.42);min-width:0}
+.lm-cycle-range-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:8px 0}
+.lm-cycle-range-inputs label{display:grid;gap:5px;font-size:11px;color:var(--lm-muted)}
+.lm-cycle-range-inputs input{box-sizing:border-box;width:100%;min-width:0;padding:9px;border:1px solid var(--lm-line);border-radius:10px;background:#011c40;color:#fff}
+.lm-cycle-range>button{width:100%;white-space:normal;line-height:1.3}
+.lm-contact-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
+.lm-contact-actions .lm-secondary{font-size:10px;padding:8px 10px;max-width:220px;white-space:normal;line-height:1.25}
+@media(max-width:480px){.lm-cycle-range{padding:9px}.lm-cycle-range-inputs{gap:7px}.lm-contact-actions{max-width:55%;gap:5px}.lm-contact-actions .lm-secondary{max-width:calc(100vw - 130px);font-size:9px;padding:7px 8px}}

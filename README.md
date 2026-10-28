@@ -1,3 +1,16 @@
+## v0.4.48 — fixes for mobile and chat-scoped data
+
+- User card is now isolated per chat and saved both in local storage and the chat metadata, so it can travel with a synced chat. A different chat starts with a clean card.
+- Cycle events no longer silently use the phone's current date. A story date can be entered, explicit dates in RP text are recognized, and manual analysis can scan a selected message range or the whole chat.
+- Cycle event history and the custom kink library no longer have the previous 200-entry cap.
+- Added a button to search the character card and current RP for repeated NPC names. The automatically found list should be reviewed because capitalized names can include false positives.
+- Mobile toast notifications are constrained to the screen width and respect safe-area insets.
+- Opening and closing a kink editor preserves the list scroll position.
+
+Note on phone-to-PC use: metadata-backed card/state follows a chat when the same SillyTavern server syncs or serves that chat. Browser local storage itself does not sync between independent SillyTavern installations or different origins.
+
+---
+
 # LoveMed — Medical Card of Love 🩺
 
 **LoveMed Engine v0.4.44** — расширение для SillyTavern, которое помогает отслеживать эмоциональное состояние персонажа, динамику отношений и чувства пользователя, а также вести отдельные записи об NPC.
