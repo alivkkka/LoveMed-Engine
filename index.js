@@ -165,20 +165,26 @@ function normalizeLibraryState(raw){
   deleted:Array.isArray(raw.deleted)?raw.deleted:[]
  };
 }
-function getLibraryState(){
- try{
-  const current=JSON.parse(localStorage.getItem(LIBRARY_KEY)||'null');
-  if(current&&typeof current==='object'&&!Array.isArray(current))return normalizeLibraryState(current);
-  const legacy=JSON.parse(localStorage.getItem(LEGACY_LIBRARY_KEY)||'null');
-  if(Array.isArray(legacy)){
-   const migrated={custom:legacy,overrides:{},deleted:[]};
-   localStorage.setItem(LIBRARY_KEY,JSON.stringify(migrated));
-   return migrated;
-  }
- }catch{}
- return {custom:[],overrides:{},deleted:[]};
+let libraryStateCache=null;
+const LIBRARY_DB_NAME='LoveMedLibraryDB', LIBRARY_DB_STORE='library', LIBRARY_DB_ID='user-library';
+function openLibraryDB(){return new Promise((resolve,reject)=>{if(!globalThis.indexedDB){reject(new Error('IndexedDB недоступен'));return;}const req=indexedDB.open(LIBRARY_DB_NAME,1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(LIBRARY_DB_STORE))req.result.createObjectStore(LIBRARY_DB_STORE);};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('Не удалось открыть IndexedDB'));});}
+async function writeLibraryDB(state){const db=await openLibraryDB();try{await new Promise((resolve,reject)=>{const tx=db.transaction(LIBRARY_DB_STORE,'readwrite');tx.objectStore(LIBRARY_DB_STORE).put(normalizeLibraryState(state),LIBRARY_DB_ID);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Не удалось сохранить библиотеку'));tx.onabort=()=>reject(tx.error||new Error('Сохранение библиотеки отменено'));});}finally{db.close();}}
+async function readLibraryDB(){const db=await openLibraryDB();try{return await new Promise((resolve,reject)=>{const tx=db.transaction(LIBRARY_DB_STORE,'readonly');const req=tx.objectStore(LIBRARY_DB_STORE).get(LIBRARY_DB_ID);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error||new Error('Не удалось прочитать библиотеку'));});}finally{db.close();}}
+function readLegacyLibrary(){try{const current=JSON.parse(localStorage.getItem(LIBRARY_KEY)||'null');if(current&&typeof current==='object'&&!Array.isArray(current))return normalizeLibraryState(current);const legacy=JSON.parse(localStorage.getItem(LEGACY_LIBRARY_KEY)||'null');if(Array.isArray(legacy))return normalizeLibraryState({custom:legacy,overrides:{},deleted:[]});}catch{}return {custom:[],overrides:{},deleted:[]};}
+function getLibraryState(){if(!libraryStateCache)libraryStateCache=readLegacyLibrary();return normalizeLibraryState(libraryStateCache);}
+function saveLibraryState(state){
+ const normalized=normalizeLibraryState(state);libraryStateCache=normalized;
+ let localSaved=false;try{localStorage.setItem(LIBRARY_KEY,JSON.stringify(normalized));localSaved=true;}catch{}
+ // IndexedDB is the durable fallback and avoids localStorage quota limits.
+ writeLibraryDB(normalized).then(()=>{if(!localSaved)toast('Библиотека сохранена в отдельном хранилище');}).catch(err=>{if(!localSaved)toast('Не удалось сохранить библиотеку. Освободи место в хранилище браузера.');console.error('[LoveMed] library save failed',err);});
+ return true;
 }
-function saveLibraryState(state){try{localStorage.setItem(LIBRARY_KEY,JSON.stringify(normalizeLibraryState(state)));}catch{}}
+async function initLibraryStorage(){
+ const localState=readLegacyLibrary();
+ try{const stored=await readLibraryDB();if(stored&&typeof stored==='object'){libraryStateCache=normalizeLibraryState(stored);try{localStorage.setItem(LIBRARY_KEY,JSON.stringify(libraryStateCache));}catch{}}else{libraryStateCache=localState;await writeLibraryDB(localState);}}
+ catch(err){libraryStateCache=localState;console.warn('[LoveMed] IndexedDB unavailable; using localStorage',err);}
+ const overlay=document.querySelector('#lmOverlay');if(overlay&&!overlay.classList.contains('hidden'))render();
+}
 function baseKink(id){
  const x=KINKS.find(k=>k[0]===id);
  if(!x)return null;
@@ -1350,7 +1356,7 @@ function bind(){
  document.querySelector('#lmAddKink')?.addEventListener('click',()=>{
   const n=document.querySelector('#lmKinkName')?.value.trim()||'',d=document.querySelector('#lmKinkDesc')?.value.trim()||'',cat=document.querySelector('#lmKinkCat')?.value||'psych';
   const words=(document.querySelector('#lmKinkWords')?.value||'').split(/[,;\n]/).map(x=>x.trim()).filter(Boolean);
-  if(!n){toast('Введите название');return;} addCustom(n,cat,d,words.length?words:[n.toLowerCase()]);render();toast('Запись добавлена');
+  if(!n){toast('Введите название');return;} const before=getLibraryState().custom.length; addCustom(n,cat,d,words.length?words:[n.toLowerCase()]); const after=getLibraryState().custom.length; render(); if(after>before)toast('Запись добавлена и сохранение запущено');else toast('Не удалось добавить запись — проверь хранилище браузера');
  });
  document.querySelectorAll('[data-edit-kink]').forEach(b=>b.onclick=()=>openEditor(b.dataset.editKink));
  document.querySelectorAll('[data-del-kink]').forEach(b=>b.onclick=()=>{deleteLibraryRecord(b.dataset.delKink);render();toast('Запись удалена');});
@@ -1435,6 +1441,7 @@ function ensureWand(){
 }
 function on(t,f){try{eventSource?.on?.(t,f);}catch{}}
 function init(){
+ initLibraryStorage();
  ensureFab();ensurePanel();ensureSettings();ensureWand();refreshPrompt();armPendingConceptionNotice();
  on(event_types.CHAT_CHANGED,()=>setTimeout(()=>{ensureFab();ensureSettings();ensureWand();render();refreshPrompt();armPendingConceptionNotice();},250));
  on(event_types.MESSAGE_RECEIVED,()=>setTimeout(parseLatest,250));
